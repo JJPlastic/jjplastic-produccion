@@ -768,13 +768,13 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
   return (
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
       {/* Header PCP */}
-      <header style={{ backgroundColor: '#1b5e20', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
+      <header style={{ backgroundColor: '#37BEEC', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
         <div>
           <p style={{ fontSize: '11px', opacity: 0.7, textTransform: 'uppercase' }}>Panel PCP</p>
           <h1 style={{ fontSize: '17px', fontWeight: 700 }}>Validación de registros</h1>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onIrKardex} style={{ backgroundColor: '#2e7d32', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onIrKardex} style={{ backgroundColor: 'rgba(255,255,255,0.25)', color: 'white', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             📦 Kardex MP
           </button>
           {onIrTablets && (

@@ -88,9 +88,9 @@ export default function KardexMP({ onVolver, onLogout }) {
         setMaquinas(activas)
       }
       if (prodsRes.status === 'fulfilled') {
-        // MP = Base (plástico estructural) | MC = Colorante/pigmento
+        const esActivo = p => p.Activo === true || p.Activo === 1 || p.Activo === undefined
         setMateriasPrimas(prodsRes.value.filter(p =>
-          ['MP', 'MC'].includes((p.TipoProducto || '').toUpperCase())
+          esActivo(p) && ['MP', 'MC'].includes((p.TipoProducto || '').toUpperCase())
         ))
       }
       if (kardexRes.status === 'fulfilled') setEntradas(kardexRes.value)
@@ -309,13 +309,13 @@ export default function KardexMP({ onVolver, onLogout }) {
   return (
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
       {/* Header */}
-      <header style={{ backgroundColor: '#1b5e20', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
+      <header style={{ backgroundColor: '#37BEEC', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
         <div>
           <p style={{ fontSize: '11px', opacity: 0.7, textTransform: 'uppercase' }}>Panel PCP</p>
           <h1 style={{ fontSize: '17px', fontWeight: 700 }}>Kardex de Materia Prima</h1>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onVolver} style={{ backgroundColor: '#2e7d32', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onVolver} style={{ backgroundColor: 'rgba(255,255,255,0.25)', color: 'white', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             ← Validación
           </button>
           <button onClick={onLogout} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
@@ -325,7 +325,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       </header>
 
       {/* Tabs */}
-      <div style={{ backgroundColor: '#1b5e20', padding: '0 16px' }}>
+      <div style={{ backgroundColor: '#37BEEC', padding: '0 16px' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto', display: 'flex', gap: '4px' }}>
           {[
             { id: 'entregas', label: '📋 Entregas registradas' },
@@ -335,7 +335,7 @@ export default function KardexMP({ onVolver, onLogout }) {
               padding: '10px 18px', border: 'none', cursor: 'pointer',
               fontSize: '14px', fontWeight: 700,
               backgroundColor: tab === t.id ? 'white' : 'transparent',
-              color: tab === t.id ? '#1b5e20' : 'rgba(255,255,255,0.75)',
+              color: tab === t.id ? '#37BEEC' : 'rgba(255,255,255,0.75)',
               borderRadius: '8px 8px 0 0',
               borderBottom: tab === t.id ? '3px solid white' : '3px solid transparent',
             }}>{t.label}</button>

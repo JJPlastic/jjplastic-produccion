@@ -53,8 +53,8 @@ export default function InicioTurno() {
         if (!token) return
         const todos = await getListItems(token, 'Maestro_Productos', { top: 500 })
         if (cancelled) return
-        // MP = plástico base | MC = colorante/pigmento
-        const mp = todos.filter(p => ['MP','MC'].includes((p.TipoProducto || '').trim().toUpperCase()))
+        const esActivo = p => p.Activo === true || p.Activo === 1 || p.Activo === undefined
+        const mp = todos.filter(p => esActivo(p) && ['MP','MC'].includes((p.TipoProducto || '').trim().toUpperCase()))
         setMateriasPrimas(mp)
       } catch (err) {
         console.error('Error cargando MP:', err)

@@ -50,16 +50,16 @@ export default function CambioProducto() {
   // - Relevo: mismo producto (read-only) + mismo color (editable, pre-seleccionado)
   // - Cambio producto: mismo producto (pre-seleccionado pero editable), color vacío
   useEffect(() => {
-    if (!turnoActivo) return
+    if (!turnoActivo || !modoRelevo) return
     if (turnoActivo.Producto) {
       setProductoSel(turnoActivo.Producto)
       setValue('Producto', turnoActivo.Producto, { shouldValidate: false })
     }
-    if (modoRelevo && turnoActivo.Color) {
+    if (turnoActivo.Color) {
       setColorSel(turnoActivo.Color)
       setValue('Color', turnoActivo.Color, { shouldValidate: false })
     }
-  }, [turnoActivo?.Producto, turnoActivo?.Color])
+  }, [turnoActivo?.Producto, turnoActivo?.Color, modoRelevo])
 
   const onSubmit = async (data) => {
     setEnviando(true)
@@ -136,7 +136,7 @@ export default function CambioProducto() {
   return (
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
       <Header
-        titulo={modoRelevo ? 'Relevo de turno' : 'Nuevo producto'}
+        titulo={modoRelevo ? 'Mismo producto' : 'Nuevo producto'}
         color={modoRelevo ? '#37BEEC' : '#004895'}
         pendingCount={pendingCount}
         onLogout={logout}
@@ -175,8 +175,8 @@ export default function CambioProducto() {
             ].map(t => (
               <button key={t.id} type="button" onClick={() => setTurnoNuevo(t.id)} style={{
                 padding: '12px 6px', borderRadius: '8px', border: '2px solid',
-                borderColor: turnoNuevo === t.id ? '#004895' : '#ddd',
-                backgroundColor: turnoNuevo === t.id ? '#004895' : 'white',
+                borderColor: turnoNuevo === t.id ? (modoRelevo ? '#37BEEC' : '#004895') : '#ddd',
+                backgroundColor: turnoNuevo === t.id ? (modoRelevo ? '#37BEEC' : '#004895') : 'white',
                 color: turnoNuevo === t.id ? 'white' : '#333',
                 fontWeight: 700, fontSize: '14px', cursor: 'pointer',
               }}>
@@ -257,10 +257,11 @@ export default function CambioProducto() {
           )}
 
           <button type="submit" disabled={enviando || cargando} style={{
-            backgroundColor: enviando ? '#ccc' : '#004895', color: 'white',
+            backgroundColor: enviando ? '#ccc' : modoRelevo ? '#37BEEC' : '#004895', color: 'white',
             border: 'none', borderRadius: '14px', padding: '18px',
             fontSize: '18px', fontWeight: 700, minHeight: '60px',
             cursor: enviando ? 'not-allowed' : 'pointer', marginTop: '4px',
+            boxShadow: enviando ? 'none' : modoRelevo ? '0 4px 16px rgba(55,190,236,0.4)' : '0 4px 16px rgba(0,72,149,0.3)',
           }}>
             {enviando ? '⏳ Iniciando...' : modoRelevo ? '🔄 Iniciar relevo' : '▶ Iniciar nuevo producto'}
           </button>
