@@ -1,0 +1,216 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════
+   DESIGN SYSTEM — JJ PLASTIC
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Brand */
+  --navy:    #004895;
+  --navy-dk: #003570;
+  --sky:     #37BEEC;
+  --orange:  #F8A12F;
+  --orange-dk: #e6901e;
+
+  /* Semáforo */
+  --verde:   #2e7d32;
+  --verde-bg:#e8f5e9;
+  --rojo:    #c62828;
+  --rojo-bg: #ffebee;
+  --amarillo:#f57f17;
+  --amarillo-bg:#fff8e1;
+
+  /* Neutros */
+  --bg:      #f0f2f5;
+  --surface: #ffffff;
+  --surface2:#f8f9fa;
+  --border:  #e0e4ea;
+  --text:    #1a1d23;
+  --text-2:  #4a5568;
+  --text-3:  #718096;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+
+  /* Radio */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  /* Tipografía */
+  --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #111318;
+    --surface: #1c1f26;
+    --surface2:#242830;
+    --border:  #2d3340;
+    --text:    #eef0f4;
+    --text-2:  #a0aab8;
+    --text-3:  #6b7588;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  touch-action: manipulation;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font);
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TIPOGRAFÍA
+   ═══════════════════════════════════════════════════════ */
+h1, h2, h3 { font-weight: 700; line-height: 1.2; color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════
+   FORMULARIOS
+   ═══════════════════════════════════════════════════════ */
+input, select, textarea {
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background-color: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  appearance: auto;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(0,72,149,0.12);
+}
+
+input::placeholder, textarea::placeholder { color: var(--text-3); }
+select option[value=""] { color: var(--text-3); }
+
+/* Sin flechitas en number */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* Checkbox */
+input[type=checkbox] {
+  width: 20px; height: 20px;
+  accent-color: var(--navy);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOTONES
+   ═══════════════════════════════════════════════════════ */
+button {
+  font-family: var(--font);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--r-sm);
+  transition: opacity 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  min-height: 44px;
+  touch-action: manipulation;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Variante primaria */
+.btn-primary {
+  background: var(--navy);
+  color: white;
+  font-weight: 700;
+  padding: 14px 24px;
+  font-size: 15px;
+  box-shadow: var(--shadow-sm);
+  min-height: 52px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--navy-dk); box-shadow: var(--shadow-md); }
+
+/* ═══════════════════════════════════════════════════════
+   CARDS / SURFACE
+   ═══════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════════
+   BADGES / CHIPS
+   ═══════════════════════════════════════════════════════ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.badge-verde   { background: var(--verde-bg);   color: var(--verde);   border: 1.5px solid var(--verde);   }
+.badge-rojo    { background: var(--rojo-bg);    color: var(--rojo);    border: 1.5px solid var(--rojo);    }
+.badge-amarillo{ background: var(--amarillo-bg);color: var(--amarillo);border: 1.5px solid var(--amarillo);}
+
+/* ═══════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════
+   LAYOUT HELPERS
+   ═══════════════════════════════════════════════════════ */
+.page { background: var(--bg); min-height: 100vh; }
+.container { max-width: 560px; margin: 0 auto; padding: 16px; }
+
+/* ═══════════════════════════════════════════════════════
+   ANIMACIONES
+   ═══════════════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.6 } }
+.fade-in { animation: fadeIn 0.2s ease forwards; }
+
+/* ═══════════════════════════════════════════════════════
+   SAFE AREA (iOS PWA)
+   ═══════════════════════════════════════════════════════ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   PREVENT ZOOM ON INPUT FOCUS (iOS)
+   ═══════════════════════════════════════════════════════ */
+@media screen and (max-width: 768px) {
+  input, select, textarea { font-size: 16px; }
+}
