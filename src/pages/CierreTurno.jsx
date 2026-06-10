@@ -49,6 +49,8 @@ export default function CierreTurno() {
   const [feedback, setFeedback]       = useState(null)
   const [fotoEvidencia, setFotoEvidencia] = useState(null)
   const fotoRef = useRef(null)
+  // null = no respondido | false = cierre final | true = continúa en otra máquina
+  const [transferenciaPendiente, setTransferenciaPendiente] = useState(null)
 
   // Kardex entries de esta OF — fuente de verdad de MP
   const [kardexOF, setKardexOF]   = useState([])
@@ -58,6 +60,7 @@ export default function CierreTurno() {
   const [mpYaUsadoOF, setMpYaUsadoOF] = useState(0)
   // Colorantes: colapsados por defecto, expandibles
   const [colorantesExpand, setColorantesExpand] = useState({})
+  const [intentoEnviar, setIntentoEnviar] = useState(false)
 
   const veracidad      = watch('CheckboxVeracidad')
   const undConfWatch   = watch('UnidadesConformes')
@@ -90,7 +93,10 @@ export default function CierreTurno() {
           getListItems(token, 'Registro_Produccion', { top: 200 }),
         ])
         if (cancelled) return
-        const delOF = kardexTodos.filter(k => k.Numero_OF === turnoActivo.Numero_OF)
+        const delOF = kardexTodos.filter(k =>
+          k.Numero_OF === turnoActivo.Numero_OF &&
+          (!turnoActivo.Producto || !k.Producto || k.Producto === turnoActivo.Producto)
+        )
         setKardexOF(delOF)
         // Sumar MP_KgUsado de registros cerrados anteriores (excluir el turno actual)
         const yaUsado = regsTodos
@@ -129,6 +135,9 @@ export default function CierreTurno() {
   const mpBaseTotal  = mpBaseKardex.reduce((s, k) => s + numEdit(mpEdits[k.ID], 'KgUsado'), 0)
 
   const hayBase = kardexOF.some(k => getTipoInsumo(k.Insumo) === 'Base')
+  const mpColorantesKardex = kardexOF.filter(k => getTipoInsumo(k.Insumo) === 'Colorante')
+  const mpBaseOk = mpBaseKardex.length === 0 || mpBaseKardex.every(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
+  const mpColorantesOk = mpColorantesKardex.length === 0 || mpColorantesKardex.some(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
 
   const kgPorUnidad  = turnoActivo?.KgPorUnidadProducto ?? 0
   // Teórico = unidades producidas × estándar
@@ -143,13 +152,16 @@ export default function CierreTurno() {
     if (feedback === 'exito') limpiarTurno()
   }, [feedback])
 
-  const canSubmit = isValid && veracidad && !enviando && (!fotoRequerida || fotoEvidencia)
+  const requiereRespuestaTransf = kardexOF.length > 0 && transferenciaPendiente === null
+  const canSubmit = isValid && veracidad && !enviando && (!fotoRequerida || fotoEvidencia) && !requiereRespuestaTransf
 
   const onSubmit = async (data) => {
+    setIntentoEnviar(true)
     if (fotoRequerida && !fotoEvidencia) {
       alert(`⚠ La foto es obligatoria cuando las defectuosas superan el 5% (${pctDefWatch.toFixed(1)}%).`)
       return
     }
+    if (kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk)) return
     setEnviando(true)
     const ahora = new Date()
 
@@ -212,69 +224,102 @@ export default function CierreTurno() {
     const tiempoProductivoMin = parseFloat(Math.max(0, tiempoTurnoMin - tiempoParadaMin).toFixed(2))
     // ─────────────────────────────────────────────────────────────────────────
 
-    const payload = {
+    // Nivel 1 — mínimo absoluto: solo Estado + HoraFin (100% garantizados)
+    const p1 = {
+      Estado:  'cerrado',
       HoraFin: ahora.toISOString(),
-      Estado: 'cerrado',
-      CheckboxVeracidad: true,
+    }
+    // Nivel 2 — datos de producción: existen si la lista tiene las columnas de cierre
+    const p2 = {
+      CheckboxVeracidad:   true,
       UnidadesConformes:   undConformes,
-      GruposConformes:     gruposConf,
-      UnidadesSueltas:     undSueltas,
       UnidadesDefectuosas: undDefectuosas,
-      // Tiempos (nuevos campos en SP)
+      Estado_Validacion:   estadoValidacion,
+      Paradas:             turnoActivo.Paradas || '[]',
+    }
+    // Nivel 3 — analíticos/nuevos: pueden no existir todavía
+    const p3 = {
+      GruposConformes:       gruposConf,
+      UnidadesSueltas:       undSueltas,
       Tiempo_Turno_Min:      tiempoTurnoMin,
       Tiempo_Parada_Min:     tiempoParadaMin,
       Tiempo_Productivo_Min: tiempoProductivoMin,
-      // MP_KgUsado = real declarado por operario (Base MP)
-      // Insumo_Base = nombre del insumo Base usado (para trazabilidad en correcciones PCP)
-      MP_KgUsado:         parseFloat(mpBaseTotal.toFixed(3)),
-      Insumo_Base:        mpBaseKardex.filter(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
-                            .map(k => k.Insumo).join(', ') || mpBaseKardex.map(k => k.Insumo).join(', '),
-      MP_Consumida_Calc:  kgPorUnidad > 0 ? parseFloat((prodTotal * kgPorUnidad).toFixed(3)) : parseFloat(mpBaseTotal.toFixed(3)),
-      Produccion_Teorica: parseFloat(prodTeorica.toFixed(1)),
-      Diferencia_Pct:     parseFloat(diferencia.toFixed(2)),
-      Estado_Validacion:  estadoValidacion,
-      Fecha_Validacion:   ahora.toISOString(),
-      KgMPRestante:       parseFloat(kgMPRestante.toFixed(3)),
+      MP_KgUsado:            parseFloat(mpBaseTotal.toFixed(3)),
+      Insumo_Base:           mpBaseKardex.filter(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
+                               .map(k => k.Insumo).join(', ') || mpBaseKardex.map(k => k.Insumo).join(', '),
+      MP_Consumida_Calc:     kgPorUnidad > 0 ? parseFloat((prodTotal * kgPorUnidad).toFixed(3)) : parseFloat(mpBaseTotal.toFixed(3)),
+      Produccion_Teorica:    parseFloat(prodTeorica.toFixed(1)),
+      Diferencia_Pct:        parseFloat(diferencia.toFixed(2)),
+      Fecha_Validacion:      ahora.toISOString(),
+      KgMPRestante:          parseFloat(kgMPRestante.toFixed(3)),
+      Transferencia_Pendiente: transferenciaPendiente === true,
       ...(obsPcpAuto ? { Obs_PCP: obsPcpAuto } : {}),
     }
+
+    const todoPayload = { ...p1, ...p2, ...p3 }
 
     try {
       const token = await getToken()
       if (turnoActivo.spId && navigator.onLine && token) {
-        // Subir foto de defectuosas si existe
+        // Foto de defectuosas
         if (fotoEvidencia) {
-          const nombreFoto = `defectuosos_${turnoActivo.spId}_${Date.now()}.jpg`
-          await uploadAttachment(token, 'Registro_Produccion', turnoActivo.spId, nombreFoto, fotoEvidencia)
-          payload.TieneFoto = true
+          try {
+            const nombreFoto = `defectuosos_${turnoActivo.spId}_${Date.now()}.jpg`
+            await uploadAttachment(token, 'Registro_Produccion', turnoActivo.spId, nombreFoto, fotoEvidencia)
+            p1.TieneFoto = true
+          } catch { /* foto no crítica */ }
         }
-        await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, payload)
 
-        // Actualizar Kardex: guardar en la entrada principal de cada grupo de insumo
+        // Nivel 1 — DEBE guardarse (Estado + HoraFin)
+        await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, p1)
+
+        // Nivel 2 — datos de producción
+        try {
+          await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, p2)
+        } catch (e2) {
+          console.warn('CierreTurno p2 fallback:', e2.message)
+          // Intentar campo a campo los más importantes
+          for (const [k, v] of Object.entries(p2)) {
+            try { await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, { [k]: v }) }
+            catch { /* campo no existe */ }
+          }
+        }
+
+        // Nivel 3 — analíticos
+        try {
+          await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, p3)
+        } catch { /* campos analíticos no configurados */ }
+
+        // Kardex MP
         const grupos = {}
         kardexOF.forEach(k => {
           const key = (k.Insumo || '').trim().toLowerCase()
           if (!grupos[key]) grupos[key] = []
           grupos[key].push(k)
         })
-        await Promise.all(
-          Object.values(grupos).map(grupo => {
-            const principal = grupo[0] // entrada representante del grupo
-            const e = mpEdits[principal.ID]
-            if (!e) return Promise.resolve()
-            return updateListItem(token, 'Kardex_MP', principal.ID, {
-              KgUsado:      (principal.KgUsado      || 0) + numEdit(e, 'KgUsado'),
-              KgMermaRec:   (principal.KgMermaRec   || 0) + numEdit(e, 'KgMermaRec'),
-              KgMermaNoRec: (principal.KgMermaNoRec || 0) + numEdit(e, 'KgMermaNoRec'),
-              KgDevueltos:  (principal.KgDevueltos  || 0) + numEdit(e, 'KgDevueltos'),
+        try {
+          await Promise.all(
+            Object.values(grupos).map(grupo => {
+              const principal = grupo[0]
+              const e = mpEdits[principal.ID]
+              if (!e) return Promise.resolve()
+              return updateListItem(token, 'Kardex_MP', principal.ID, {
+                KgUsado:      (principal.KgUsado      || 0) + numEdit(e, 'KgUsado'),
+                KgMermaRec:   (principal.KgMermaRec   || 0) + numEdit(e, 'KgMermaRec'),
+                KgMermaNoRec: (principal.KgMermaNoRec || 0) + numEdit(e, 'KgMermaNoRec'),
+                KgDevueltos:  (principal.KgDevueltos  || 0) + numEdit(e, 'KgDevueltos'),
+              })
             })
-          })
-        )
+          )
+        } catch { /* Kardex no crítico */ }
+
       } else {
-        await encolarOperacion({ tipo: 'update', listName: 'Registro_Produccion', spId: turnoActivo.spId, data: payload })
+        await encolarOperacion({ tipo: 'update', listName: 'Registro_Produccion', spId: turnoActivo.spId, data: todoPayload })
       }
       setFeedback('exito')
     } catch (err) {
-      await encolarOperacion({ tipo: 'update', listName: 'Registro_Produccion', spId: turnoActivo.spId, data: payload })
+      console.error('CierreTurno error crítico:', err)
+      await encolarOperacion({ tipo: 'update', listName: 'Registro_Produccion', spId: turnoActivo.spId, data: todoPayload })
       setFeedback('exito')
     } finally {
       setEnviando(false)
@@ -312,9 +357,9 @@ export default function CierreTurno() {
                   hint: tieneReportes ? `${acumConfTurno} (avances) + ${parseInt(undConfWatch)||0} = ${totalConfTurno}` : null },
                 { name: 'UnidadesDefectuosas', label: 'Und. defectuosas',  color: '#c62828', requerido: true,  total: totalDef,
                   hint: tieneReportes && acumDefTurno > 0 ? `${acumDefTurno} (avances) + ${parseInt(undDefWatch)||0} = ${totalDef}` : null },
-                { name: 'GruposConformes',     label: 'Grupos conformes',  color: '#004895', requerido: true,  total: null,
+                { name: 'GruposConformes',     label: 'Grupos conformes',  color: '#555555', requerido: false, total: null,
                   hint: totalConfTurno > 0 ? `De las ${totalConfTurno} und. conformes del turno` : null },
-                { name: 'UnidadesSueltas',     label: 'Und. sueltas',      color: '#f57f17', requerido: false, total: null,
+                { name: 'UnidadesSueltas',     label: 'Und. sueltas',      color: '#555555', requerido: true,  total: null,
                   hint: totalConfTurno > 0 ? `Conformes sin grupo (${totalConfTurno} und. totales)` : null },
               ]
               return (
@@ -373,6 +418,48 @@ export default function CierreTurno() {
               <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>2 — Balance de materia prima</p>
             </div>
             <div style={{ padding: '12px' }}>
+
+            {/* Pregunta: ¿la OF continúa en otra máquina? */}
+            {kardexOF.length > 0 && (
+              <div style={{
+                borderRadius: '10px', marginBottom: '14px', overflow: 'hidden',
+                border: `2px solid ${transferenciaPendiente === null ? '#F8A12F' : transferenciaPendiente ? '#37BEEC' : '#4caf50'}`,
+              }}>
+                <div style={{
+                  backgroundColor: transferenciaPendiente === null ? '#fff8e1' : transferenciaPendiente ? '#e3f7fd' : '#e8f5e9',
+                  padding: '10px 14px',
+                }}>
+                  <p style={{ fontSize: '13px', fontWeight: 700, color: '#333', margin: '0 0 10px' }}>
+                    ¿La producción de esta OF continúa en otra máquina?
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => setTransferenciaPendiente(false)} style={{
+                      flex: 1, padding: '10px 8px', borderRadius: '8px', border: '2px solid',
+                      borderColor: transferenciaPendiente === false ? '#4caf50' : '#ddd',
+                      backgroundColor: transferenciaPendiente === false ? '#4caf50' : 'white',
+                      color: transferenciaPendiente === false ? 'white' : '#333',
+                      fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    }}>
+                      ✓ No — cierre final
+                    </button>
+                    <button type="button" onClick={() => setTransferenciaPendiente(true)} style={{
+                      flex: 1, padding: '10px 8px', borderRadius: '8px', border: '2px solid',
+                      borderColor: transferenciaPendiente === true ? '#37BEEC' : '#ddd',
+                      backgroundColor: transferenciaPendiente === true ? '#37BEEC' : 'white',
+                      color: transferenciaPendiente === true ? 'white' : '#333',
+                      fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    }}>
+                      → Sí — se transfiere
+                    </button>
+                  </div>
+                  {transferenciaPendiente === true && (
+                    <p style={{ fontSize: '11px', color: '#0288d1', marginTop: '8px', marginBottom: 0 }}>
+                      ℹ No llenes "Kg devueltos" — PCP gestionará los kg restantes desde Kardex MP.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {cargandoKardex ? (
               <p style={{ color: '#888', fontSize: '13px' }}>Cargando insumos de la OF...</p>
@@ -462,28 +549,42 @@ export default function CierreTurno() {
                     {(tipo === 'Base' || colorantesExpand[k.ID]) && (
                     <div style={{ backgroundColor: 'white', padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {[
-                        ['KgUsado',      'Kg usado en prod.', '#004895'],
-                        ['KgMermaRec',   'Kg merma rec.',     '#f57f17'],
-                        ['KgMermaNoRec', 'Kg merma no rec.',  '#c62828'],
-                        ['KgDevueltos',  'Kg devueltos',      '#2e7d32'],
-                      ].map(([campo, label, color]) => (
+                        ['KgUsado',      'Kg usado en prod.'],
+                        ['KgMermaRec',   'Kg merma rec.'],
+                        ['KgMermaNoRec', 'Kg merma no rec.'],
+                        ['KgDevueltos',  'Kg devueltos'],
+                      ].filter(([campo]) => !(campo === 'KgDevueltos' && transferenciaPendiente === true))
+                      .map(([campo, label]) => {
+                        const esBaseReq = campo === 'KgUsado' && tipo === 'Base'
+                        const campoError = esBaseReq && intentoEnviar && numEdit(e, 'KgUsado') <= 0
+                        return (
                         <div key={campo}>
-                          <label style={{ fontSize: '11px', fontWeight: 600, color, display: 'block', marginBottom: '3px' }}>{label}</label>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: campoError ? '#d32f2f' : '#555', display: 'block', marginBottom: '3px' }}>
+                            {label}{esBaseReq ? ' *' : ''}
+                          </label>
                           <input
                             type="number" step="0.01" min="0"
                             value={e[campo] ?? ''}
                             onChange={ev => updateMpEdit(k.ID, campo, ev.target.value)}
                             placeholder="0"
-                            style={{ ...smallInput, borderColor: color + '80' }}
+                            style={{ ...smallInput, borderColor: campoError ? '#d32f2f' : '#ddd' }}
                           />
+                          {campoError && <p style={{ color: '#d32f2f', fontSize: '10px', margin: '2px 0 0' }}>Obligatorio</p>}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     )}
                   </div>
                 )
               })
               })()
+            )}
+
+            {intentoEnviar && !mpColorantesOk && mpColorantesKardex.length > 0 && (
+              <div style={{ backgroundColor: '#ffebee', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#c62828', margin: '4px 0 8px' }}>
+                ⚠ Expande al menos un colorante e ingresa los kg usados
+              </div>
             )}
 
             {/* Aviso si no hay MP Base etiquetada */}
@@ -521,6 +622,15 @@ export default function CierreTurno() {
             )}
             </div>{/* fin padding MP */}
           </div>
+
+          {/* Error MP visible antes del botón */}
+          {intentoEnviar && kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk) && (
+            <div style={{ backgroundColor: '#ffebee', border: '2px solid #d32f2f', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#c62828', fontWeight: 600 }}>
+              ⚠ Completa el balance de MP antes de confirmar:
+              {!mpBaseOk && <div style={{ fontWeight: 400, marginTop: '4px' }}>• Ingresa los kg usados en cada MP Base</div>}
+              {!mpColorantesOk && mpColorantesKardex.length > 0 && <div style={{ fontWeight: 400, marginTop: '4px' }}>• Ingresa los kg usados en al menos un colorante</div>}
+            </div>
+          )}
 
           {/* ── 3: Confirmación + envío ── */}
           <div style={{ backgroundColor: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>

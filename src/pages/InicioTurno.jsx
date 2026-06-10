@@ -68,11 +68,17 @@ export default function InicioTurno() {
   const [feedback, setFeedback]             = useState(null)
   const [ofsActivas, setOfsActivas]         = useState([])
   const [ofSeleccionada, setOfSeleccionada] = useState(null)
-  // Filas de MP (múltiples materias primas)
-  const [filasMP, setFilasMP] = useState([{ id: crypto.randomUUID(), mp: '', kg: '' }])
-  const agregarFilaMP  = () => setFilasMP(p => [...p, { id: crypto.randomUUID(), mp: '', kg: '' }])
+  const [productoOfSel, setProductoOfSel]   = useState('') // producto elegido dentro de la OF
+  // Filas de MP (múltiples materias primas, cada una lleva su producto)
+  const [filasMP, setFilasMP] = useState([{ id: crypto.randomUUID(), mp: '', kg: '', producto: '' }])
+  const agregarFilaMP  = () => setFilasMP(p => [...p, { id: crypto.randomUUID(), mp: '', kg: '', producto: '' }])
   const eliminarFilaMP = (id) => setFilasMP(p => p.length > 1 ? p.filter(f => f.id !== id) : p)
   const updateFilaMP   = (id, campo, val) => setFilasMP(p => p.map(f => f.id === id ? { ...f, [campo]: val } : f))
+
+  const resolverNombre = (codigo) => {
+    const p = productos.find(x => (x.Codigo || '') === codigo || (x.Nombre || x.Title || '') === codigo)
+    return p ? (p.Nombre || p.Title || codigo) : codigo
+  }
 
   const turnoSel = watch('Turno')
 
@@ -108,29 +114,37 @@ export default function InicioTurno() {
     setOfPreseleccionada(null) // consumir para no repetir
   }, [ofPreseleccionada])
 
-  // Cuando operario selecciona una OF → pre-llenar filas de MP desde Kardex
+  // Cuando cambia la OF → auto-seleccionar producto si hay uno solo + cargar TODAS las MPs
   useEffect(() => {
     if (!ofSeleccionada) return
-    // Usar los datos de MP ya cargados en la OF (vienen de getOFsActivas)
-    if (ofSeleccionada.mp && ofSeleccionada.mp.length > 0) {
-      // Consolidar entradas del mismo insumo (suma kg) antes de crear filas
+    // Auto-seleccionar producto
+    const prods = ofSeleccionada.productos || []
+    if (prods.length === 1) {
+      setProductoOfSel(prods[0])
+      setValue('Producto', prods[0], { shouldValidate: false })
+    } else {
+      setProductoOfSel('')
+    }
+    // Cargar TODAS las MPs de la OF (agrupadas por producto)
+    const todasMP = ofSeleccionada.mp || []
+    if (todasMP.length > 0) {
       const consolidado = {}
-      ofSeleccionada.mp
+      todasMP
         .filter(m => m.insumo && m.insumo !== '—' && m.insumo.trim() !== '')
         .forEach(m => {
-          const key = m.insumo.trim().toLowerCase()
-          if (!consolidado[key]) consolidado[key] = { insumo: m.insumo, kg: 0 }
-          consolidado[key].kg += m.kg || 0
+          const key = `${m.producto || ''}__${m.insumo.trim().toLowerCase()}`
+          if (!consolidado[key]) consolidado[key] = { insumo: m.insumo, kg: 0, producto: m.producto || '' }
+          consolidado[key].kg += (m.kg - (m.kgDev || 0)) || 0
         })
-      const filasKardex = Object.values(consolidado).map(m => ({
+      const filas = Object.values(consolidado).map(m => ({
         id: crypto.randomUUID(),
         mp: m.insumo,
         kg: String(m.kg > 0 ? m.kg : ''),
+        producto: m.producto,
       }))
-      setFilasMP(filasKardex.length > 0 ? filasKardex : [{ id: crypto.randomUUID(), mp: '', kg: '' }])
+      setFilasMP(filas.length > 0 ? filas : [{ id: crypto.randomUUID(), mp: '', kg: '', producto: '' }])
     } else {
-      // OF sin Kardex (operario registró primero) → dejar fila vacía
-      setFilasMP([{ id: crypto.randomUUID(), mp: '', kg: '' }])
+      setFilasMP([{ id: crypto.randomUUID(), mp: '', kg: '', producto: '' }])
     }
   }, [ofSeleccionada?.of])
 
@@ -245,6 +259,7 @@ export default function InicioTurno() {
                 KgDevueltos: 0,
                 Observacion: 'Registrada por operario',
                 Numero_OF: numeroOF,
+                Producto: f.producto || '',
               })
             ))
           } else {
@@ -254,15 +269,22 @@ export default function InicioTurno() {
             const kardexOF = kardexActual.filter(k => k.Numero_OF === numeroOF)
 
             await Promise.all(filasValidasMP.map(async f => {
-              const matching = kardexOF.find(k =>
-                (k.Insumo || '').toLowerCase() === (f.mp || '').toLowerCase()
-              )
+              // Priorizar match exacto por Insumo + Producto; fallback a solo Insumo
+              const matching =
+                kardexOF.find(k =>
+                  (k.Insumo || '').toLowerCase() === (f.mp || '').toLowerCase() &&
+                  (k.Producto || '') === (f.producto || '')
+                ) ||
+                kardexOF.find(k =>
+                  (k.Insumo || '').toLowerCase() === (f.mp || '').toLowerCase() &&
+                  !(k.Producto)
+                )
               if (matching) {
                 const kgOp = parseFloat(f.kg)
                 const hayDiferencia = Math.abs(kgOp - (matching.KgEntregados || 0)) > 0.01
                 await updateListItem(token, 'Kardex_MP', matching.ID, {
                   KgDeclaradoOperario: kgOp,
-                  // Si el operario declara diferente a lo que PCP registró → marcar para validación
+                  Producto: f.producto || '',
                   ...(hayDiferencia ? { Observacion: 'Registrada por operario' } : {}),
                 })
               } else {
@@ -277,6 +299,7 @@ export default function InicioTurno() {
                   KgDevueltos: 0,
                   Observacion: 'Declarada por operario — no en Kardex PCP',
                   Numero_OF: numeroOF,
+                  Producto: f.producto || '',
                 })
               }
             }))
@@ -324,110 +347,218 @@ export default function InicioTurno() {
       />
 
       <div style={{ padding: '10px 12px', maxWidth: '480px', margin: '0 auto' }}>
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          {/* OF — si viene preseleccionada */}
-          {ofSeleccionada && (
-            <div style={{ backgroundColor: '#e8f5e9', borderRadius: '8px', padding: '7px 12px' }}>
-              <span style={{ color: '#1b5e20', fontWeight: 700, fontSize: '12px', fontFamily: 'monospace' }}>✓ {ofSeleccionada.of}</span>
-            </div>
-          )}
-
-          {/* Turno + Operario + Apoyo en una sola tarjeta */}
-          <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '10px 12px', border: '1.5px solid #e0e0e0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {/* Turno */}
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', display: 'block', marginBottom: '5px' }}>Turno *</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                {TURNOS.map(t => (
-                  <button key={t.id} type="button"
-                    onClick={() => setValue('Turno', t.id, { shouldValidate: true })}
-                    style={{
-                      padding: '10px 4px', borderRadius: '8px', border: '2px solid',
-                      borderColor: turnoSel === t.id ? '#004895' : '#ddd',
-                      backgroundColor: turnoSel === t.id ? '#004895' : '#f8f8f8',
-                      color: turnoSel === t.id ? 'white' : '#333',
-                      fontWeight: 700, fontSize: '14px', cursor: 'pointer', lineHeight: 1.2,
-                    }}>
-                    <div>{t.label}</div>
-                  </button>
-                ))}
-              </div>
-              <input type="hidden" {...register('Turno', { required: 'Selecciona un turno' })} />
-              {errors.Turno && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '2px' }}>{errors.Turno.message}</p>}
-            </div>
-            {/* Operario + Apoyo */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Operario *</label>
-                <input type="hidden" {...register('Operario', { required: 'Selecciona un operario' })} />
-                <SearchSelect opciones={operarios.map(op => ({ value: String(op.ID), label: op.Nombre || op.Title || '' }))}
-                  value={watch('Operario')} onChange={v => setValue('Operario', v, { shouldValidate: true })} placeholder="Buscar..." />
-                {errors.Operario && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '2px' }}>{errors.Operario.message}</p>}
-              </div>
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Apoyo</label>
-                <SearchSelect opciones={[{ value: '', label: 'Sin apoyo' }, ...operarios.map(op => ({ value: String(op.ID), label: op.Nombre || op.Title || '' }))]}
-                  value={watch('OperarioApoyo') || ''} onChange={v => setValue('OperarioApoyo', v)} placeholder="Buscar..." />
-                <input type="hidden" {...register('OperarioApoyo')} />
-              </div>
-            </div>
-          </div>
-
-          {/* Producto — línea completa */}
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>Producto *</label>
-            <input type="hidden" {...register('Producto', { required: 'Selecciona un producto' })} />
-            <SearchSelect opciones={productos.map(p => {
-              const nombre = p.Nombre || p.Title || ''; const codigo = p.Codigo || ''
-              return { value: codigo || nombre, label: nombre + (codigo ? ` (${codigo})` : '') }
-            })} value={watch('Producto')} onChange={v => setValue('Producto', v, { shouldValidate: true })} placeholder="Buscar producto..." />
-            {errors.Producto && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '2px' }}>{errors.Producto.message}</p>}
-          </div>
-
-          {/* Color — línea completa */}
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>Color *</label>
-            <input type="hidden" {...register('Color', { required: 'Selecciona un color' })} />
-            <SearchSelect opciones={colores.map(c => ({ value: c.Nombre || c.Title || '', label: c.Nombre || c.Title || '' }))}
-              value={watch('Color')} onChange={v => setValue('Color', v, { shouldValidate: true })} placeholder="Buscar color..." />
-            {errors.Color && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '2px' }}>{errors.Color.message}</p>}
-          </div>
-
-          {/* MP recibida */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-              <label style={{ fontWeight: 600, fontSize: '12px', color: '#555' }}>
-                MP recibida *
-                {ofSeleccionada?.tieneKardex && <span style={{ fontSize: '11px', color: '#2e7d32', marginLeft: '6px', fontWeight: 600 }}>✓ Kardex</span>}
-              </label>
-              <button type="button" onClick={agregarFilaMP} style={{
-                backgroundColor: '#004895', color: 'white', border: 'none',
-                borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
-              }}>+ Agregar MP</button>
-            </div>
-            <div>
-              {filasMP.map(fila => (
-                <div key={fila.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 28px', gap: '5px', marginBottom: '6px', alignItems: 'center' }}>
-                  <SearchSelect opciones={materiasPrimas.map(mp => ({
-                    value: mp.Nombre || mp.Title || '',
-                    label: (mp.Nombre || mp.Title || '') + (mp.Codigo ? ` (${mp.Codigo})` : ''),
-                  }))} value={fila.mp} onChange={v => updateFilaMP(fila.id, 'mp', v)} placeholder="Buscar MP..." />
-                  <input type="number" step="0.01" min="0" value={fila.kg}
-                    onChange={e => updateFilaMP(fila.id, 'kg', e.target.value)} placeholder="0.00"
-                    style={{ ...selectStyle, textAlign: 'right', fontWeight: 700, fontSize: '15px', padding: '10px 8px' }} />
-                  <button type="button" onClick={() => eliminarFilaMP(fila.id)} disabled={filasMP.length === 1}
-                    style={{ backgroundColor: filasMP.length === 1 ? '#f5f5f5' : '#ffebee', color: filasMP.length === 1 ? '#ccc' : '#c62828',
-                      border: 'none', borderRadius: '5px', width: '28px', height: '44px', fontSize: '15px', cursor: filasMP.length === 1 ? 'not-allowed' : 'pointer' }}>×</button>
+          {/* ── BLOQUE 1: Turno + Operario ── */}
+          {(() => {
+            const ok = turnoSel && watch('Operario')
+            return (
+              <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${ok ? '#004895' : '#e0e0e0'}`, overflow: 'hidden' }}>
+                <div style={{ backgroundColor: ok ? '#004895' : '#f5f5f5', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ backgroundColor: ok ? 'rgba(255,255,255,0.25)' : '#ddd', color: ok ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>1</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: ok ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {ok ? `Turno ${turnoSel} · ${watch('Operario') ? operarios.find(o => String(o.ID) === watch('Operario'))?.Nombre?.split(' ')[0] || '—' : '—'}` : 'Turno y operario'}
+                  </span>
                 </div>
-              ))}
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                      {TURNOS.map(t => (
+                        <button key={t.id} type="button"
+                          onClick={() => setValue('Turno', t.id, { shouldValidate: true })}
+                          style={{
+                            padding: '12px 4px', borderRadius: '8px', border: '2px solid',
+                            borderColor: turnoSel === t.id ? '#004895' : '#ddd',
+                            backgroundColor: turnoSel === t.id ? '#004895' : '#fafafa',
+                            color: turnoSel === t.id ? 'white' : '#555',
+                            fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                          }}>{t.label}</button>
+                      ))}
+                    </div>
+                    <input type="hidden" {...register('Turno', { required: true })} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Operario *</label>
+                      <input type="hidden" {...register('Operario', { required: 'Selecciona un operario' })} />
+                      <SearchSelect opciones={operarios.map(op => ({ value: String(op.ID), label: op.Nombre || op.Title || '' }))}
+                        value={watch('Operario')} onChange={v => setValue('Operario', v, { shouldValidate: true })} placeholder="Buscar..." />
+                      {errors.Operario && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '2px' }}>{errors.Operario.message}</p>}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#888', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Apoyo</label>
+                      <SearchSelect opciones={[{ value: '', label: 'Sin apoyo' }, ...operarios.map(op => ({ value: String(op.ID), label: op.Nombre || op.Title || '' }))]}
+                        value={watch('OperarioApoyo') || ''} onChange={v => setValue('OperarioApoyo', v)} placeholder="Buscar..." />
+                      <input type="hidden" {...register('OperarioApoyo')} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── BLOQUE 2: OF + producto ── */}
+          {(() => {
+            const prodOk = !!watch('Producto')
+            return (
+              <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${prodOk ? '#004895' : '#e0e0e0'}`, overflow: 'hidden' }}>
+                <div style={{ backgroundColor: prodOk ? '#004895' : '#f5f5f5', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ backgroundColor: prodOk ? 'rgba(255,255,255,0.25)' : '#ddd', color: prodOk ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>2</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: prodOk ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em', flex: 1 }}>
+                    {prodOk ? resolverNombre(watch('Producto')) : 'Producto a producir'}
+                  </span>
+                  {ofSeleccionada && <span style={{ fontSize: '10px', color: prodOk ? 'rgba(255,255,255,0.7)' : '#aaa', fontFamily: 'monospace' }}>{ofSeleccionada.of}</span>}
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  <input type="hidden" {...register('Producto', { required: 'Selecciona un producto' })} />
+
+                  {/* Con OF y varios productos → selector de radio */}
+                  {ofSeleccionada && (ofSeleccionada.productos || []).length > 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(ofSeleccionada.productos || []).map(cod => {
+                        const sel = watch('Producto') === cod
+                        return (
+                          <button key={cod} type="button"
+                            onClick={() => { setProductoOfSel(cod); setValue('Producto', cod, { shouldValidate: true }) }}
+                            style={{
+                              padding: '11px 14px', borderRadius: '10px', border: '2px solid',
+                              borderColor: sel ? '#2e7d32' : '#e0e0e0',
+                              backgroundColor: sel ? '#f0fff4' : '#fafafa',
+                              color: sel ? '#2e7d32' : '#555',
+                              fontWeight: sel ? 800 : 500, fontSize: '14px',
+                              cursor: 'pointer', textAlign: 'left',
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                            }}>
+                            <span style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${sel ? '#2e7d32' : '#ccc'}`, backgroundColor: sel ? '#2e7d32' : 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {sel && <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'white' }} />}
+                            </span>
+                            {resolverNombre(cod)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Con OF y un producto → mostrar nombre */}
+                  {ofSeleccionada && (ofSeleccionada.productos || []).length === 1 && (
+                    <div style={{ backgroundColor: '#f0fff4', borderRadius: '8px', padding: '10px 12px', border: '1.5px solid #a5d6a7', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '20px' }}>✅</span>
+                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#2e7d32' }}>{resolverNombre(ofSeleccionada.productos[0])}</span>
+                    </div>
+                  )}
+
+                  {/* Sin OF → SearchSelect libre */}
+                  {!ofSeleccionada && (
+                    <SearchSelect opciones={productos.map(p => {
+                      const nombre = p.Nombre || p.Title || ''; const codigo = p.Codigo || ''
+                      return { value: codigo || nombre, label: nombre + (codigo ? ` (${codigo})` : '') }
+                    })} value={watch('Producto')} onChange={v => setValue('Producto', v, { shouldValidate: true })} placeholder="Buscar producto..." />
+                  )}
+                  {errors.Producto && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '4px' }}>{errors.Producto.message}</p>}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── BLOQUE 3: Color (solo aparece cuando hay producto) ── */}
+          {watch('Producto') && (() => {
+            const colorOk = !!watch('Color')
+            return (
+              <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${colorOk ? '#004895' : '#e0e0e0'}` }}>
+                <div style={{ backgroundColor: colorOk ? '#004895' : '#f5f5f5', padding: '8px 14px', borderRadius: '10px 10px 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ backgroundColor: colorOk ? 'rgba(255,255,255,0.25)' : '#ddd', color: colorOk ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>3</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colorOk ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {colorOk ? `Color: ${watch('Color')}` : 'Color de producción'}
+                  </span>
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  <input type="hidden" {...register('Color', { required: 'Selecciona un color' })} />
+                  <SearchSelect opciones={colores.map(c => ({ value: c.Nombre || c.Title || '', label: c.Nombre || c.Title || '' }))}
+                    value={watch('Color')} onChange={v => setValue('Color', v, { shouldValidate: true })} placeholder="Buscar color..." />
+                  {errors.Color && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '4px' }}>{errors.Color.message}</p>}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── BLOQUE 4: MP recibida ── */}
+          {(() => {
+            const mpOk = filasMP.some(f => f.mp && parseFloat(f.kg) > 0)
+            const tieneKardex = ofSeleccionada?.tieneKardex
+            return (
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${mpOk ? '#004895' : '#e0e0e0'}` }}>
+            <div style={{ backgroundColor: mpOk ? '#004895' : '#f5f5f5', padding: '8px 14px', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ backgroundColor: mpOk ? 'rgba(255,255,255,0.25)' : '#ddd', color: mpOk ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: mpOk ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  MP recibida {tieneKardex && <span style={{ fontSize: '10px', opacity: 0.85 }}>· ✓ Kardex PCP</span>}
+                </span>
+              </div>
+              {!filasMP.some(f => f.producto) && (
+                <button type="button" onClick={agregarFilaMP} style={{
+                  backgroundColor: mpOk ? 'rgba(255,255,255,0.25)' : '#2e7d32', color: 'white', border: 'none',
+                  borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                }}>+ Agregar MP</button>
+              )}
             </div>
+
+            <div style={{ padding: '8px 12px' }}>
+              {(() => {
+                // Agrupar filasMP por producto
+                const grupos = {}
+                filasMP.forEach(f => {
+                  const prod = f.producto || ''
+                  if (!grupos[prod]) grupos[prod] = []
+                  grupos[prod].push(f)
+                })
+                const tieneGrupos = Object.keys(grupos).some(k => k !== '')
+                return Object.entries(grupos).map(([prod, filas], gIdx) => (
+                  <div key={prod || 'sin'} style={{ marginBottom: gIdx < Object.keys(grupos).length - 1 ? '12px' : 0 }}>
+                    {/* Sub-cabecera de producto con botón agregar */}
+                    {tieneGrupos && (
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        backgroundColor: '#f0fff4', borderLeft: '3px solid #2e7d32',
+                        padding: '4px 8px', marginBottom: '6px', borderRadius: '0 4px 4px 0',
+                      }}>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#2e7d32' }}>
+                          {prod ? resolverNombre(prod) : '—'}
+                        </span>
+                        <button type="button"
+                          onClick={() => setFilasMP(p => [...p, { id: crypto.randomUUID(), mp: '', kg: '', producto: prod }])}
+                          style={{
+                            backgroundColor: '#2e7d32', color: 'white', border: 'none',
+                            borderRadius: '5px', padding: '2px 8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                          }}>+ MP</button>
+                      </div>
+                    )}
+                    {filas.map(fila => (
+                      <div key={fila.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 28px', gap: '5px', marginBottom: '5px', alignItems: 'center' }}>
+                        <SearchSelect opciones={materiasPrimas.map(mp => ({
+                          value: mp.Nombre || mp.Title || '',
+                          label: (mp.Nombre || mp.Title || '') + (mp.Codigo ? ` (${mp.Codigo})` : ''),
+                        }))} value={fila.mp} onChange={v => updateFilaMP(fila.id, 'mp', v)} placeholder="Buscar MP..." />
+                        <input type="number" step="0.01" min="0" value={fila.kg}
+                          onChange={e => updateFilaMP(fila.id, 'kg', e.target.value)} placeholder="0.00"
+                          style={{ ...selectStyle, textAlign: 'right', fontWeight: 700, fontSize: '15px', padding: '10px 8px' }} />
+                        <button type="button" onClick={() => eliminarFilaMP(fila.id)} disabled={filasMP.length === 1}
+                          style={{ backgroundColor: filasMP.length === 1 ? '#f5f5f5' : '#ffebee', color: filasMP.length === 1 ? '#ccc' : '#c62828',
+                            border: 'none', borderRadius: '5px', width: '28px', height: '44px', fontSize: '15px', cursor: filasMP.length === 1 ? 'not-allowed' : 'pointer' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              })()}
+            </div>
+
             {filasMP.some(f => parseFloat(f.kg) > 0) && (
-              <div style={{ textAlign: 'right', fontSize: '13px', fontWeight: 800, color: '#004895', marginTop: '2px' }}>
+              <div style={{ padding: '6px 14px 8px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: '#2e7d32', borderTop: '1px solid #f0f0f0' }}>
                 Total: {filasMP.reduce((s, f) => s + (parseFloat(f.kg) || 0), 0).toFixed(2)} kg
               </div>
             )}
           </div>
+            )
+          })()}
 
           <button type="submit" disabled={enviando} style={{
             backgroundColor: enviando ? '#ccc' : '#004895', color: 'white',

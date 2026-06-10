@@ -131,10 +131,12 @@ export const getOFsActivas = async (token, maquina) => {
             insumo: k.Insumo || '—',
             kg: parseFloat(k.KgEntregados) || 0,
             kgDev: parseFloat(k.KgDevueltos) || 0,
+            producto: k.Producto || '',
           })
           if (k.Insumo && !mapa[of].insumos.includes(k.Insumo)) {
             mapa[of].insumos.push(k.Insumo)
           }
+          if (k.Producto) mapa[of].productos.add(k.Producto)
         })
     }
 
@@ -176,18 +178,28 @@ export const getOFsActivas = async (token, maquina) => {
     })
 
     return ofsActivas.map(o => {
-      // Consolidar entradas del mismo insumo (suma kg y kgDev)
+      // Consolidar entradas del mismo insumo+producto
       const mpConsolidado = {}
       o.mp.forEach(m => {
-        const key = (m.insumo || '').trim().toLowerCase()
-        if (!mpConsolidado[key]) mpConsolidado[key] = { insumo: m.insumo, kg: 0, kgDev: 0 }
+        const key = `${m.producto || ''}__${(m.insumo || '').trim().toLowerCase()}`
+        if (!mpConsolidado[key]) mpConsolidado[key] = { insumo: m.insumo, kg: 0, kgDev: 0, producto: m.producto || '' }
         mpConsolidado[key].kg    += m.kg    || 0
         mpConsolidado[key].kgDev += m.kgDev || 0
       })
       const mpFinal = Object.values(mpConsolidado)
+
+      // Agrupar por producto → { producto: [{insumo, kg, kgDev}] }
+      const mpPorProducto = {}
+      mpFinal.forEach(m => {
+        const prod = m.producto || ''
+        if (!mpPorProducto[prod]) mpPorProducto[prod] = []
+        mpPorProducto[prod].push(m)
+      })
+
       return {
         ...o,
         mp: mpFinal,
+        mpPorProducto,
         productos: [...o.productos],
         totalKgMP: mpFinal.reduce((s, m) => s + (m.kg - m.kgDev), 0),
         resumenMP: mpFinal.map(m =>

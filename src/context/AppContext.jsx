@@ -12,7 +12,8 @@ export const AppProvider = ({ children }) => {
   // null = pendiente de detección desde Maestro_Operarios
   const [rol, setRol]               = useState(null)
   const [modoRelevo, setModoRelevo] = useState(false)
-  const [ofPreseleccionada, setOfPreseleccionada] = useState(null) // OF elegida en Bienvenida → pasa a InicioTurno
+  const [ofPreseleccionada, setOfPreseleccionada] = useState(null)
+  const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
 
   useEffect(() => {
     const init = async () => {
@@ -73,6 +74,7 @@ export const AppProvider = ({ children }) => {
       rol, seleccionarRol,
       modoRelevo, setModoRelevo,
       ofPreseleccionada, setOfPreseleccionada,
+      productoPreseleccionado, setProductoPreseleccionado,
     }}>
       {children}
     </AppContext.Provider>

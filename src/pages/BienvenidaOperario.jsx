@@ -5,7 +5,7 @@ import { useMsal } from '../hooks/useMsal'
 import { useApp } from '../context/AppContext'
 import { Header } from '../components/Header'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { getListItems, getOFsActivas } from '../services/sharepoint'
+import { getListItems, getOFsActivas, updateListItem } from '../services/sharepoint'
 import { useMaestros } from '../hooks/useMaestros'
 import { tabletConfig } from '../config/tabletConfig'
 
@@ -14,7 +14,7 @@ const TURNO_LABEL = { M: 'Mañana', T: 'Tarde', N: 'Noche' }
 
 export default function BienvenidaOperario() {
   const { getToken, usuario, logout } = useMsal()
-  const { setTurnoActivo, setPantalla, pendingCount, seleccionarRol, setModoRelevo, setOfPreseleccionada } = useApp()
+  const { setTurnoActivo, setPantalla, pendingCount, seleccionarRol, setModoRelevo, setOfPreseleccionada, setProductoPreseleccionado } = useApp()
   const { productos: catalogoProductos } = useMaestros(getToken)
 
   const resolverNombre = (codigo) => {
@@ -27,6 +27,7 @@ export default function BienvenidaOperario() {
   const [registrosCerrados, setRegistrosCerrados] = useState([])
   const [ofsKardex, setOfsKardex]             = useState([])
   const [cargandoReg, setCargandoReg]         = useState(null)
+  const [pendingProductos, setPendingProductos] = useState([]) // productos pendientes de la última OF
 
   useEffect(() => {
     let cancelled = false
@@ -59,11 +60,31 @@ export default function BienvenidaOperario() {
               ? cerradosHoy.filter(r => r.Numero_OF === ofMasReciente)
               : [cerradosHoy[0]]
             setRegistrosCerrados(deEsaOF)
+
+            // Cargar productos pendientes de esa OF
+            if (ofMasReciente) {
+              try {
+                const kardexOf = await getListItems(token, 'Kardex_MP', {
+                  filter: `Numero_OF eq '${ofMasReciente}'`, top: 100,
+                })
+                const prodsOf = [...new Set(kardexOf.filter(k => k.Producto).map(k => k.Producto))]
+                const completadosOF = new Set(deEsaOF.map(r => r.Producto))
+                const activosOF = new Set(
+                  deMiMaquina
+                    .filter(r => r.Numero_OF === ofMasReciente && (r.Estado === 'abierto' || r.Estado === 'transferido'))
+                    .map(r => r.Producto)
+                )
+                setPendingProductos(prodsOf.filter(p => !completadosOF.has(p) && !activosOF.has(p)))
+              } catch { /* no crítico */ }
+            }
           }
         }
 
         if (ofs.status === 'fulfilled') {
-          const sinRegistro = ofs.value.filter(o => o.tieneKardex && !o.tieneRegistro)
+          const sinRegistro = ofs.value.filter(o =>
+            o.tieneKardex && !o.tieneRegistro &&
+            (!tabletConfig.codigoMaquina || o.maquina === tabletConfig.codigoMaquina)
+          )
           setOfsKardex(sinRegistro)
         }
       } catch (err) {
@@ -90,26 +111,13 @@ export default function BienvenidaOperario() {
   const continuarProducto = async (registro) => {
     setCargandoReg(registro.ID)
     await setTurnoActivo({
-      Maquina: registro.Title || tabletConfig.codigoMaquina,
-      Turno: registro.Turno,
-      Operario: registro.Operario,
-      Operario_Apoyo: registro.Operario_Apoyo,
-      Producto: registro.Producto,
-      ProductoNombre: registro.Producto,
-      Color: registro.Color,
-      HoraInicio: registro.HoraInicio,
-      Fecha: registro.Fecha,
-      Estado: registro.Estado,
-      Tipo_Apertura: registro.Tipo_Apertura,
-      Registro_Previo_ID: registro.Registro_Previo_ID,
+      ...registro,
       Paradas: registro.Paradas || '[]',
-      Estado_Validacion: registro.Estado_Validacion,
-      Numero_OF: registro.Numero_OF,
-      Codigo_Lote: registro.Codigo_Lote,
-      KgPorUnidadProducto: 0,
       spId: registro.ID,
-      localId: registro.ID?.toString(),
+      Estado: 'cerrado', // relevo: crea nuevo registro en cambio-producto
     })
+    setModoRelevo(true)
+    setPantalla('cambio-producto')
     setCargandoReg(null)
   }
 
@@ -145,7 +153,7 @@ export default function BienvenidaOperario() {
         pendingCount={pendingCount}
         onLogout={logout}
         onCambiarRol={() => seleccionarRol(null)}
-        color="transparent"
+        color="#002d5a"
       />
 
       <div style={{
@@ -260,20 +268,36 @@ export default function BienvenidaOperario() {
               </span>
               <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace' }}>{of.of}</span>
             </div>
-            <div style={{ padding: '12px 16px 0' }}>
-              {of.resumenMP && of.resumenMP.split(' · ').map((item, i, arr) => {
-                const partes = item.split(': ')
-                return (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 0',
-                    borderBottom: i < arr.length - 1 ? '1px solid #f0f0f0' : 'none',
+            <div style={{ padding: '10px 16px 0' }}>
+              {of.mpPorProducto && Object.entries(of.mpPorProducto).map(([prod, mps], pIdx) => (
+                <div key={prod || pIdx} style={{ marginBottom: '8px' }}>
+                  {/* Sub-cabecera de producto */}
+                  <div style={{
+                    backgroundColor: '#f0fff4',
+                    borderLeft: '3px solid #2e7d32',
+                    padding: '5px 10px',
+                    marginBottom: '4px',
+                    borderRadius: '0 6px 6px 0',
                   }}>
-                    <span style={{ fontSize: '13px', color: '#555' }}>• {partes[0] || item}</span>
-                    <span style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: 700 }}>{partes[1] || ''}</span>
+                    <p style={{ fontSize: '13px', fontWeight: 800, color: '#2e7d32', margin: 0 }}>
+                      {prod ? resolverNombre(prod) : '—'}
+                    </p>
                   </div>
-                )
-              })}
+                  {/* MPs de este producto */}
+                  {mps.map((m, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '5px 4px',
+                      borderBottom: i < mps.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    }}>
+                      <span style={{ fontSize: '13px', color: '#555' }}>• {m.insumo}</span>
+                      <span style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: 700 }}>
+                        {(m.kg - m.kgDev).toFixed(2)} kg
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
             <div style={{ padding: '12px' }}>
               <button
@@ -366,6 +390,7 @@ export default function BienvenidaOperario() {
               </div>
             </div>
             <div style={{ padding: '4px 12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Continuar mismo producto — siempre disponible */}
               <button
                 onClick={async () => {
                   setCargandoReg('relevo')
@@ -386,26 +411,60 @@ export default function BienvenidaOperario() {
                 }}>
                 {cargandoReg === 'relevo' ? '⏳' : '🔄'} Continuar mismo producto
               </button>
-              <button
-                onClick={async () => {
-                  setCargandoReg('cambio')
-                  await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
-                  setModoRelevo(false)
-                  setPantalla('cambio-producto')
-                  setCargandoReg(null)
-                }}
-                disabled={!!cargandoReg}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #004895, #1565c0)',
-                  color: 'white', border: 'none', borderRadius: '10px',
-                  padding: '14px', fontSize: '14px', fontWeight: 700,
-                  minHeight: '50px', cursor: 'pointer',
-                  boxShadow: '0 3px 10px rgba(0,72,149,0.3)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                }}>
-                {cargandoReg === 'cambio' ? '⏳' : '📦'} Otro producto
-              </button>
+
+              {/* Productos pendientes de la OF */}
+              {pendingProductos.length > 0 ? (
+                <>
+                  <p style={{ fontSize: '11px', color: '#888', margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '2px' }}>
+                    Productos pendientes de la OF
+                  </p>
+                  {pendingProductos.map(cod => (
+                    <button
+                      key={cod}
+                      onClick={async () => {
+                        setCargandoReg('prod-' + cod)
+                        await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
+                        setModoRelevo(false)
+                        setProductoPreseleccionado(cod)
+                        setPantalla('cambio-producto')
+                        setCargandoReg(null)
+                      }}
+                      disabled={!!cargandoReg}
+                      style={{
+                        width: '100%',
+                        background: 'linear-gradient(135deg, #004895, #1565c0)',
+                        color: 'white', border: 'none', borderRadius: '10px',
+                        padding: '14px', fontSize: '14px', fontWeight: 700,
+                        minHeight: '50px', cursor: 'pointer',
+                        boxShadow: '0 3px 10px rgba(0,72,149,0.3)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      }}>
+                      {cargandoReg === 'prod-' + cod ? '⏳' : '▶'} {resolverNombre(cod)}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setCargandoReg('cambio')
+                    await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
+                    setModoRelevo(false)
+                    setPantalla('cambio-producto')
+                    setCargandoReg(null)
+                  }}
+                  disabled={!!cargandoReg}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #004895, #1565c0)',
+                    color: 'white', border: 'none', borderRadius: '10px',
+                    padding: '14px', fontSize: '14px', fontWeight: 700,
+                    minHeight: '50px', cursor: 'pointer',
+                    boxShadow: '0 3px 10px rgba(0,72,149,0.3)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  }}>
+                  {cargandoReg === 'cambio' ? '⏳' : '📦'} Otro producto
+                </button>
+              )}
             </div>
           </div>
         ) : (

@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext'
 import { useMaestros } from '../hooks/useMaestros'
 import { Header } from '../components/Header'
 import { SearchSelect } from '../components/SearchSelect'
-import { createListItem } from '../services/sharepoint'
+import { createListItem, updateListItem, getListItems } from '../services/sharepoint'
 import { encolarOperacion } from '../services/indexedDB'
 import { tabletConfig } from '../config/tabletConfig'
 
@@ -26,7 +26,7 @@ const Field = ({ label, error, children }) => (
 
 export default function CambioProducto() {
   const { getToken, usuario, logout } = useMsal()
-  const { turnoActivo, setTurnoActivo, pendingCount, limpiarTurno, modoRelevo, setModoRelevo, setPantalla } = useApp()
+  const { turnoActivo, setTurnoActivo, pendingCount, limpiarTurno, modoRelevo, setModoRelevo, setPantalla, productoPreseleccionado, setProductoPreseleccionado } = useApp()
   const { productos, colores, operarios, cargando } = useMaestros(getToken)
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm()
@@ -34,8 +34,10 @@ export default function CambioProducto() {
   const [error, setError]       = useState(null)
   const [productoSel, setProductoSel] = useState('')
   const [colorSel, setColorSel]       = useState('')
-  // Turno: pre-cargado del turno activo pero editable (puede ser un nuevo período)
   const [turnoNuevo, setTurnoNuevo] = useState(turnoActivo?.Turno || 'M')
+  // Productos pendientes de la OF (para modo "Cambiar")
+  const [productosOf, setProductosOf] = useState([])
+  const [loadingOf, setLoadingOf]     = useState(false)
 
   // Pre-seleccionar operario por email (entrante)
   useEffect(() => {
@@ -46,20 +48,59 @@ export default function CambioProducto() {
     if (match) setValue('Operario', String(match.ID), { shouldValidate: false })
   }, [operarios, usuario?.email])
 
-  // Pre-cargar según el modo:
-  // - Relevo: mismo producto (read-only) + mismo color (editable, pre-seleccionado)
-  // - Cambio producto: mismo producto (pre-seleccionado pero editable), color vacío
+  // Cargar productos pendientes de la OF en modo "Cambiar"
   useEffect(() => {
-    if (!turnoActivo || !modoRelevo) return
-    if (turnoActivo.Producto) {
-      setProductoSel(turnoActivo.Producto)
-      setValue('Producto', turnoActivo.Producto, { shouldValidate: false })
+    if (modoRelevo || !turnoActivo?.Numero_OF) return
+    let cancelled = false
+    const load = async () => {
+      setLoadingOf(true)
+      try {
+        const token = await getToken()
+        if (!token || !navigator.onLine) return
+        const [kardex, regs] = await Promise.all([
+          getListItems(token, 'Kardex_MP', { top: 200 }),
+          getListItems(token, 'Registro_Produccion', { top: 100 }),
+        ])
+        if (cancelled) return
+        const prodsOf = [...new Set(
+          kardex
+            .filter(k => k.Numero_OF === turnoActivo.Numero_OF && k.Producto)
+            .map(k => k.Producto)
+        )]
+        // Excluir productos activos (abierto/transferido) y ya completados (cerrado)
+        const excluir = new Set(
+          regs
+            .filter(r => r.Numero_OF === turnoActivo.Numero_OF &&
+                         (r.Estado === 'abierto' || r.Estado === 'transferido' || r.Estado === 'cerrado'))
+            .map(r => r.Producto)
+        )
+        if (!cancelled) setProductosOf(prodsOf.filter(p => !excluir.has(p)))
+      } catch { /* fallback al catálogo completo */ }
+      finally { if (!cancelled) setLoadingOf(false) }
     }
-    if (turnoActivo.Color) {
-      setColorSel(turnoActivo.Color)
-      setValue('Color', turnoActivo.Color, { shouldValidate: false })
+    load()
+    return () => { cancelled = true }
+  }, [turnoActivo?.Numero_OF, modoRelevo])
+
+  // Pre-cargar según el modo
+  useEffect(() => {
+    if (!turnoActivo) return
+    if (modoRelevo) {
+      if (turnoActivo.Producto) {
+        setProductoSel(turnoActivo.Producto)
+        setValue('Producto', turnoActivo.Producto, { shouldValidate: false })
+      }
+      if (turnoActivo.Color) {
+        setColorSel(turnoActivo.Color)
+        setValue('Color', turnoActivo.Color, { shouldValidate: false })
+      }
+    } else if (productoPreseleccionado) {
+      // Viene de Bienvenida con producto ya elegido
+      setProductoSel(productoPreseleccionado)
+      setValue('Producto', productoPreseleccionado, { shouldValidate: false })
+      setProductoPreseleccionado(null) // consumir
     }
-  }, [turnoActivo?.Producto, turnoActivo?.Color, modoRelevo])
+  }, [turnoActivo?.Producto, turnoActivo?.Color, modoRelevo, productoPreseleccionado])
 
   const onSubmit = async (data) => {
     setEnviando(true)
@@ -98,6 +139,16 @@ export default function CambioProducto() {
         KgPorUnidadProducto: kgPorUnidad,
         Codigo_Lote: codigoLote,
         Numero_OF: numeroOF,
+      }
+
+      // Cerrar registro previo en SP si aún estaba abierto/transferido
+      if (turnoActivo.spId && token && navigator.onLine && turnoActivo.Estado !== 'cerrado') {
+        try {
+          await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, {
+            Estado: 'transferido',
+            HoraFin: ahora.toISOString(),
+          })
+        } catch { /* no crítico */ }
       }
 
       let nuevoSpId = null
@@ -199,8 +250,9 @@ export default function CambioProducto() {
             </select>
           </Field>
 
-          {/* Producto — bloqueado en relevo, editable en cambio de producto */}
+          {/* Producto */}
           {modoRelevo ? (
+            // Relevo: mismo producto bloqueado
             <div>
               <label style={{ fontWeight: 600, fontSize: '14px', color: '#333', display: 'block', marginBottom: '6px' }}>
                 Producto (continuación del turno anterior)
@@ -220,18 +272,58 @@ export default function CambioProducto() {
               </div>
               <input type="hidden" {...register('Producto')} />
             </div>
-          ) : (
-            <Field label="Nuevo producto *" error={errors.Producto?.message}>
+          ) : productosOf.length > 0 ? (
+            // Cambiar: productos pendientes de la OF
+            <div>
+              <label style={{ fontWeight: 600, fontSize: '14px', color: '#333', display: 'block', marginBottom: '8px' }}>
+                Productos pendientes de la OF *
+                <span style={{ fontSize: '11px', color: '#888', fontWeight: 400, marginLeft: '8px', fontFamily: 'monospace' }}>{turnoActivo?.Numero_OF}</span>
+              </label>
               <input type="hidden" {...register('Producto', { required: 'Selecciona un producto' })} />
-              <SearchSelect
-                opciones={productos.map(p => ({
-                  value: p.Codigo || p.Nombre || p.Title || '',
-                  label: (p.Nombre || p.Title || '') + (p.Codigo ? ` (${p.Codigo})` : ''),
-                }))}
-                value={productoSel}
-                onChange={v => { setProductoSel(v); setValue('Producto', v, { shouldValidate: true }) }}
-                placeholder="Buscar producto..."
-              />
+              {errors.Producto && <p style={{ color: '#d32f2f', fontSize: '13px', marginBottom: '6px' }}>{errors.Producto.message}</p>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {productosOf.map(cod => {
+                  const prod = productos.find(p => (p.Codigo || '') === cod || (p.Nombre || p.Title || '') === cod)
+                  const nombre = prod ? (prod.Nombre || prod.Title || cod) : cod
+                  const sel = productoSel === cod
+                  return (
+                    <button key={cod} type="button"
+                      onClick={() => { setProductoSel(cod); setValue('Producto', cod, { shouldValidate: true }) }}
+                      style={{
+                        padding: '12px 14px', borderRadius: '10px', border: '2px solid',
+                        borderColor: sel ? '#004895' : '#e0e0e0',
+                        backgroundColor: sel ? '#e8f0fb' : '#fafafa',
+                        color: sel ? '#004895' : '#555',
+                        fontWeight: sel ? 800 : 500, fontSize: '14px',
+                        cursor: 'pointer', textAlign: 'left',
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                      }}>
+                      <span style={{ width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${sel ? '#004895' : '#ccc'}`, backgroundColor: sel ? '#004895' : 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {sel && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'white' }} />}
+                      </span>
+                      {nombre}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            // Sin OF o sin productos pendientes: catálogo completo
+            <Field label={`${turnoActivo?.Numero_OF ? 'Nuevo producto *' : 'Nuevo producto *'}`} error={errors.Producto?.message}>
+              <input type="hidden" {...register('Producto', { required: 'Selecciona un producto' })} />
+              {loadingOf ? (
+                <p style={{ fontSize: '13px', color: '#888' }}>Cargando productos de la OF...</p>
+              ) : (
+                <SearchSelect
+                  opciones={productos.map(p => ({
+                    value: p.Codigo || p.Nombre || p.Title || '',
+                    label: (p.Nombre || p.Title || '') + (p.Codigo ? ` (${p.Codigo})` : ''),
+                  }))}
+                  value={productoSel}
+                  onChange={v => { setProductoSel(v); setValue('Producto', v, { shouldValidate: true }) }}
+                  placeholder="Buscar producto..."
+                />
+              )}
             </Field>
           )}
 
