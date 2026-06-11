@@ -8,14 +8,6 @@ import { encolarOperacion } from '../services/indexedDB'
 import { useProduccionParcial } from '../hooks/useProduccionParcial'
 import { useMaestros } from '../hooks/useMaestros'
 
-// Campos de producción — sin MP (los MP van en Kardex)
-const camposProduccion = [
-  { name: 'UnidadesConformes',   label: 'Unidades conformes',   entero: true,  requerido: true },
-  { name: 'GruposConformes',     label: 'Grupos conformes',      entero: true,  requerido: true },
-  { name: 'UnidadesSueltas',     label: 'Unidades sueltas',      entero: true,  requerido: false },
-  { name: 'UnidadesDefectuosas', label: 'Unidades defectuosas',  entero: true,  requerido: true },
-]
-
 const inputStyle = {
   width: '100%', padding: '14px 12px', borderRadius: '10px',
   border: '2px solid #ddd', fontSize: '20px', fontWeight: 700,
@@ -229,30 +221,33 @@ export default function CierreTurno() {
       Estado:  'cerrado',
       HoraFin: ahora.toISOString(),
     }
-    // Nivel 2 — datos de producción: existen si la lista tiene las columnas de cierre
+    // Nivel 2 — datos de producción core + MP (columnas que deben existir en SP)
+    const insumoBaseNombre = mpBaseKardex.filter(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
+      .map(k => k.Insumo).join(', ') || mpBaseKardex.map(k => k.Insumo).join(', ')
+
     const p2 = {
       CheckboxVeracidad:   true,
       UnidadesConformes:   undConformes,
       UnidadesDefectuosas: undDefectuosas,
       Estado_Validacion:   estadoValidacion,
       Paradas:             turnoActivo.Paradas || '[]',
+      // MP — campos principales del registro de producción
+      MP_KgUsado:          parseFloat(mpBaseTotal.toFixed(3)),
+      Insumo_Base:         insumoBaseNombre,
+      Transferencia_Pendiente: transferenciaPendiente === true,
     }
-    // Nivel 3 — analíticos/nuevos: pueden no existir todavía
+    // Nivel 3 — analíticos: pueden no existir todavía
     const p3 = {
       GruposConformes:       gruposConf,
       UnidadesSueltas:       undSueltas,
       Tiempo_Turno_Min:      tiempoTurnoMin,
       Tiempo_Parada_Min:     tiempoParadaMin,
       Tiempo_Productivo_Min: tiempoProductivoMin,
-      MP_KgUsado:            parseFloat(mpBaseTotal.toFixed(3)),
-      Insumo_Base:           mpBaseKardex.filter(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
-                               .map(k => k.Insumo).join(', ') || mpBaseKardex.map(k => k.Insumo).join(', '),
       MP_Consumida_Calc:     kgPorUnidad > 0 ? parseFloat((prodTotal * kgPorUnidad).toFixed(3)) : parseFloat(mpBaseTotal.toFixed(3)),
       Produccion_Teorica:    parseFloat(prodTeorica.toFixed(1)),
       Diferencia_Pct:        parseFloat(diferencia.toFixed(2)),
       Fecha_Validacion:      ahora.toISOString(),
       KgMPRestante:          parseFloat(kgMPRestante.toFixed(3)),
-      Transferencia_Pendiente: transferenciaPendiente === true,
       ...(obsPcpAuto ? { Obs_PCP: obsPcpAuto } : {}),
     }
 
@@ -285,10 +280,16 @@ export default function CierreTurno() {
           }
         }
 
-        // Nivel 3 — analíticos
+        // Nivel 3 — analíticos (campo a campo si el bloque falla)
         try {
           await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, p3)
-        } catch { /* campos analíticos no configurados */ }
+        } catch (e3) {
+          console.warn('CierreTurno p3 fallback campo a campo:', e3.message)
+          for (const [k, v] of Object.entries(p3)) {
+            try { await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, { [k]: v }) }
+            catch { /* campo analítico no existe en SP */ }
+          }
+        }
 
         // Kardex MP
         const grupos = {}
