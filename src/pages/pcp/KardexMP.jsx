@@ -38,16 +38,24 @@ export default function KardexMP({ onVolver, onLogout }) {
   // ── Grupos de entrega (producto → sus MPs) ───────────────────────────────
   const [grupos, setGrupos] = useState([grupoVacio()])
 
-  const agregarGrupo = () => setGrupos(prev => [...prev, grupoVacio()])
-  const eliminarGrupo = (gid) => setGrupos(prev => prev.length > 1 ? prev.filter(g => g.id !== gid) : prev)
-  const updateGrupoProducto = (gid, val) =>
+  const agregarGrupo = () => { setFeedback(null); setGrupos(prev => [...prev, grupoVacio()]) }
+  const eliminarGrupo = (gid) => { setFeedback(null); setGrupos(prev => prev.length > 1 ? prev.filter(g => g.id !== gid) : prev) }
+  const updateGrupoProducto = (gid, val) => {
+    setFeedback(null)
     setGrupos(prev => prev.map(g => g.id === gid ? { ...g, producto: val } : g))
-  const agregarFilaGrupo = (gid) =>
+  }
+  const agregarFilaGrupo = (gid) => {
+    setFeedback(null)
     setGrupos(prev => prev.map(g => g.id === gid && g.filas.length < 5 ? { ...g, filas: [...g.filas, filaVacia()] } : g))
-  const eliminarFilaGrupo = (gid, fid) =>
+  }
+  const eliminarFilaGrupo = (gid, fid) => {
+    setFeedback(null)
     setGrupos(prev => prev.map(g => g.id === gid ? { ...g, filas: g.filas.length > 1 ? g.filas.filter(f => f.id !== fid) : g.filas } : g))
-  const updateFilaGrupo = (gid, fid, campo, valor) =>
+  }
+  const updateFilaGrupo = (gid, fid, campo, valor) => {
+    setFeedback(null)
     setGrupos(prev => prev.map(g => g.id === gid ? { ...g, filas: g.filas.map(f => f.id === fid ? { ...f, [campo]: valor } : f) } : g))
+  }
 
   // ── Datos ─────────────────────────────────────────────────────────────────
   const [maquinas, setMaquinas]             = useState([])
