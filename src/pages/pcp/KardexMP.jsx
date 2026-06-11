@@ -159,6 +159,17 @@ export default function KardexMP({ onVolver, onLogout }) {
 
   useEffect(() => { cargar() }, [cargar])
 
+  // Resolver código → nombre para display (busca en ambos catálogos)
+  const resolverNombreMaestro = (codigo) => {
+    if (!codigo || codigo === '(sin producto)') return codigo
+    const todos = [...materiasPrimas, ...productosPA]
+    const item = todos.find(p =>
+      (p.Codigo || '') === codigo ||
+      (p.Nombre || p.Title || '').toLowerCase() === codigo.toLowerCase()
+    )
+    return item ? (item.Nombre || item.Title || codigo) : codigo
+  }
+
   // Cuando PCP selecciona máquina, cargar OFs activas para sugerir
   useEffect(() => {
     if (!maquina) { setOfsActivasMaq([]); return }
@@ -920,7 +931,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                                   {/* Sub-cabecera de producto */}
                                   <div style={{ backgroundColor: '#f0f4ff', padding: '6px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span style={{ fontSize: '12px', fontWeight: 700, color: '#004895' }}>
-                                      {prodNombre === '(sin producto)' ? '—' : prodNombre}
+                                      {prodNombre === '(sin producto)' ? '—' : resolverNombreMaestro(prodNombre)}
                                     </span>
                                     <span style={{ fontSize: '12px', color: '#555' }}>{totalProd.toFixed(2)} kg</span>
                                   </div>
@@ -939,7 +950,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                                   {/* Fila principal: nombre + total */}
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: entries.length > 0 ? '8px' : 0 }}>
                                     <div>
-                                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{nombre}</span>
+                                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{resolverNombreMaestro(nombre)}</span>
                                       {tieneOp && (
                                         <span style={{ marginLeft: '8px', backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>OP</span>
                                       )}
@@ -1174,7 +1185,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                   <p style={{ fontSize: '13px', color: '#e65100', margin: 0 }}>⚠ No hay kg disponibles — todos fueron usados o devueltos.</p>
                 ) : insumosDisp.map(i => (
                   <div key={i.nombre} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {i.nombre}</span>
+                    <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {resolverNombreMaestro(i.nombre)}</span>
                     <strong style={{ fontSize: '13px', color: '#0288d1' }}>{i.disponible.toFixed(2)} kg</strong>
                   </div>
                 ))}
