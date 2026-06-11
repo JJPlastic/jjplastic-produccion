@@ -1241,7 +1241,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                   <label style={{ ...lbl, fontSize: '11px' }}>Insumo</label>
                   <SearchSelect
                     opciones={materiasPrimas.map(mp => ({
-                      value: mp.Nombre || mp.Title || '',
+                      value: mp.Codigo || mp.Nombre || mp.Title || '',
                       label: (mp.Nombre || mp.Title || '') + (mp.Codigo ? ` (${mp.Codigo})` : ''),
                     }))}
                     value={fila.mp}
