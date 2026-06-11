@@ -227,29 +227,23 @@ export default function BienvenidaOperario() {
                 </span>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', padding: '8px 12px 14px' }}>
+            <div style={{ padding: '8px 12px 14px' }}>
               <button
-                onClick={() => continuarProducto(reg)}
+                onClick={async () => {
+                  setCargandoReg(reg.ID)
+                  await setTurnoActivo({ ...reg, Paradas: reg.Paradas || '[]', spId: reg.ID })
+                  setCargandoReg(null)
+                }}
                 disabled={cargandoReg === reg.ID}
                 style={{
+                  width: '100%',
                   background: 'linear-gradient(135deg, #37BEEC, #0288d1)',
                   color: 'white', border: 'none', borderRadius: '10px',
-                  padding: '13px', fontSize: '14px', fontWeight: 800,
-                  cursor: 'pointer', minHeight: '48px',
+                  padding: '14px', fontSize: '15px', fontWeight: 800,
+                  cursor: 'pointer', minHeight: '50px',
                   boxShadow: '0 3px 10px rgba(55,190,236,0.4)',
                 }}>
-                {cargandoReg === reg.ID ? '⏳' : '▶ Continuar'}
-              </button>
-              <button
-                onClick={() => cambiarProducto(reg)}
-                disabled={cargandoReg === reg.ID}
-                style={{
-                  backgroundColor: '#f0f4ff', color: '#004895',
-                  border: 'none', borderRadius: '10px',
-                  padding: '13px', fontSize: '13px', fontWeight: 600,
-                  cursor: 'pointer', minHeight: '48px',
-                }}>
-                Cambiar
+                {cargandoReg === reg.ID ? '⏳' : '▶ Volver al turno activo'}
               </button>
             </div>
           </div>
