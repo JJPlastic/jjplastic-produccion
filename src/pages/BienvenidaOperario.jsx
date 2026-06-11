@@ -348,6 +348,7 @@ export default function BienvenidaOperario() {
                     <button
                       key={cod}
                       onClick={async () => {
+                        if (fueTransferida) return
                         setCargandoReg('prod-' + cod)
                         await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
                         setModoRelevo(false)
@@ -355,19 +356,26 @@ export default function BienvenidaOperario() {
                         setPantalla('cambio-producto')
                         setCargandoReg(null)
                       }}
-                      disabled={!!cargandoReg}
+                      disabled={!!cargandoReg || fueTransferida}
+                      title={fueTransferida ? 'OF transferida a otra máquina' : ''}
                       style={{
                         width: '100%',
-                        background: 'linear-gradient(135deg, #004895, #1565c0)',
+                        background: fueTransferida ? '#bdbdbd' : 'linear-gradient(135deg, #004895, #1565c0)',
                         color: 'white', border: 'none', borderRadius: '10px',
                         padding: '14px', fontSize: '14px', fontWeight: 700,
-                        minHeight: '50px', cursor: 'pointer',
-                        boxShadow: '0 3px 10px rgba(0,72,149,0.3)',
+                        minHeight: '50px', cursor: fueTransferida ? 'not-allowed' : 'pointer',
+                        opacity: fueTransferida ? 0.65 : 1,
+                        boxShadow: fueTransferida ? 'none' : '0 3px 10px rgba(0,72,149,0.3)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                       }}>
                       {cargandoReg === 'prod-' + cod ? '⏳' : '▶'} {resolverNombre(cod)}
                     </button>
                   ))}
+                  {fueTransferida && (
+                    <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0', textAlign: 'center' }}>
+                      OF transferida a otra máquina
+                    </p>
+                  )}
                 </>
               ) : !ultimoReg?.Numero_OF ? (
                 /* "Otro producto" — solo si el turno anterior fue sin OF de PCP */
