@@ -110,13 +110,18 @@ export default function CambioProducto() {
       const ahora  = new Date()
       const opObj  = operarios.find(o => String(o.ID) === String(data.Operario))
       const opNombre = opObj ? (opObj.Nombre || opObj.Title || '') : ''
-      const prodObj  = productos.find(p => (p.Codigo || '') === data.Producto)
+      // Normalizar a código — por si llegó como nombre desde Kardex o turno anterior
+      const prodObj  = productos.find(p =>
+        (p.Codigo || '') === data.Producto ||
+        (p.Nombre || p.Title || '').toLowerCase() === (data.Producto || '').toLowerCase()
+      )
+      const productoCodigo = prodObj?.Codigo || data.Producto
       const kgPorUnidad = prodObj?.KgPorUnidad ?? 0
 
-      // Codigo_Lote: relevo hereda, cambio de producto genera nuevo
+      // Codigo_Lote siempre usa código de producto
       const codigoLote = modoRelevo
-        ? (turnoActivo.Codigo_Lote || `${tabletConfig.codigoMaquina}-${data.Producto}-${format(ahora, 'yyyyMMdd-HHmm')}`)
-        : `${tabletConfig.codigoMaquina}-${data.Producto}-${format(ahora, 'yyyyMMdd-HHmm')}`
+        ? (turnoActivo.Codigo_Lote || `${tabletConfig.codigoMaquina}-${productoCodigo}-${format(ahora, 'yyyyMMdd-HHmm')}`)
+        : `${tabletConfig.codigoMaquina}-${productoCodigo}-${format(ahora, 'yyyyMMdd-HHmm')}`
 
       // Numero_OF: SIEMPRE se hereda (la OF agrupa toda la sesión de la máquina)
       const numeroOF = turnoActivo.Numero_OF || `OF-${tabletConfig.codigoMaquina}-${format(ahora, 'yyyyMMdd-HHmm')}`
@@ -126,7 +131,7 @@ export default function CambioProducto() {
         Turno: turnoNuevo,
         Operario: opNombre,
         Operario_Apoyo: null,
-        Producto: data.Producto,
+        Producto: productoCodigo,
         Color: data.Color,
         HoraInicio: ahora.toISOString(),
         Fecha: ahora.toISOString(),
@@ -157,7 +162,7 @@ export default function CambioProducto() {
           Title: tabletConfig.codigoMaquina,
           Turno: turnoNuevo,
           Operario: opNombre,
-          Producto: nuevoRegistroLocal.Producto,
+          Producto: productoCodigo,
           Color: nuevoRegistroLocal.Color,
           HoraInicio: nuevoRegistroLocal.HoraInicio,
           Fecha: nuevoRegistroLocal.Fecha,

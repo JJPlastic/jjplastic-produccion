@@ -167,13 +167,23 @@ export default function InicioTurno() {
     const opNombre = opObj ? (opObj.Nombre || opObj.Title || '') : ''
     const apNombre = apObj ? (apObj.Nombre || apObj.Title || '') : ''
 
-    // KgPorUnidad del producto seleccionado — necesario para calcular semáforo al cerrar
-    const prodObj = productos.find(p => (p.Codigo || '') === data.Producto)
-    const kgPorUnidad    = prodObj?.KgPorUnidad ?? 0
-    const productoNombre = prodObj?.Nombre || prodObj?.Title || data.Producto
+    // Normalizar valor (código o nombre) → siempre devuelve el código si existe
+    const resolverCodigo = (val) => {
+      const p = productos.find(x =>
+        (x.Codigo || '') === val ||
+        (x.Nombre || x.Title || '').toLowerCase() === (val || '').toLowerCase()
+      )
+      return p?.Codigo || val
+    }
 
-    // Código de lote: por producto
-    const codigoLote = `${tabletConfig.codigoMaquina}-${data.Producto}-${format(ahora, 'yyyyMMdd-HHmm')}`
+    // KgPorUnidad del producto seleccionado — necesario para calcular semáforo al cerrar
+    const productoCodigo = resolverCodigo(data.Producto)
+    const prodObj = productos.find(p => (p.Codigo || '') === productoCodigo)
+    const kgPorUnidad    = prodObj?.KgPorUnidad ?? 0
+    const productoNombre = prodObj?.Nombre || prodObj?.Title || productoCodigo
+
+    // Código de lote: por producto (usa código)
+    const codigoLote = `${tabletConfig.codigoMaquina}-${productoCodigo}-${format(ahora, 'yyyyMMdd-HHmm')}`
     // Número OF: agrupa todos los productos de la misma sesión de máquina
     // Si operario seleccionó una OF activa (PCP registró Kardex primero) → usarla
     // Si no → generar nueva (sin código de producto, cubre toda la sesión)
@@ -187,7 +197,7 @@ export default function InicioTurno() {
       Turno: data.Turno,
       Operario: opNombre,
       Operario_Apoyo: apNombre || null,
-      Producto: data.Producto,
+      Producto: productoCodigo,
       Color: data.Color,
       HoraInicio: ahora.toISOString(),
       Fecha: ahora.toISOString(),
@@ -259,7 +269,7 @@ export default function InicioTurno() {
                 KgDevueltos: 0,
                 Observacion: 'Registrada por operario',
                 Numero_OF: numeroOF,
-                Producto: f.producto || '',
+                Producto: resolverCodigo(f.producto),
               })
             ))
           } else {
@@ -269,11 +279,12 @@ export default function InicioTurno() {
             const kardexOF = kardexActual.filter(k => k.Numero_OF === numeroOF)
 
             await Promise.all(filasValidasMP.map(async f => {
+              const prodCodigoFila = resolverCodigo(f.producto)
               // Priorizar match exacto por Insumo + Producto; fallback a solo Insumo
               const matching =
                 kardexOF.find(k =>
                   (k.Insumo || '').toLowerCase() === (f.mp || '').toLowerCase() &&
-                  (k.Producto || '') === (f.producto || '')
+                  (k.Producto || '') === prodCodigoFila
                 ) ||
                 kardexOF.find(k =>
                   (k.Insumo || '').toLowerCase() === (f.mp || '').toLowerCase() &&
@@ -284,7 +295,7 @@ export default function InicioTurno() {
                 const hayDiferencia = Math.abs(kgOp - (matching.KgEntregados || 0)) > 0.01
                 await updateListItem(token, 'Kardex_MP', matching.ID, {
                   KgDeclaradoOperario: kgOp,
-                  Producto: f.producto || '',
+                  Producto: prodCodigoFila,
                   ...(hayDiferencia ? { Observacion: 'Registrada por operario' } : {}),
                 })
               } else {
@@ -299,7 +310,7 @@ export default function InicioTurno() {
                   KgDevueltos: 0,
                   Observacion: 'Declarada por operario — no en Kardex PCP',
                   Numero_OF: numeroOF,
-                  Producto: f.producto || '',
+                  Producto: prodCodigoFila,
                 })
               }
             }))
