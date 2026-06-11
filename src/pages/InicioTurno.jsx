@@ -546,7 +546,7 @@ export default function InicioTurno() {
                     {filas.map(fila => (
                       <div key={fila.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 28px', gap: '5px', marginBottom: '5px', alignItems: 'center' }}>
                         <SearchSelect opciones={materiasPrimas.map(mp => ({
-                          value: mp.Nombre || mp.Title || '',
+                          value: mp.Codigo || mp.Nombre || mp.Title || '',
                           label: (mp.Nombre || mp.Title || '') + (mp.Codigo ? ` (${mp.Codigo})` : ''),
                         }))} value={fila.mp} onChange={v => updateFilaMP(fila.id, 'mp', v)} placeholder="Buscar MP..." />
                         <input type="number" step="0.01" min="0" value={fila.kg}
