@@ -298,7 +298,7 @@ export default function CierreTurno() {
           grupos[key].push(k)
         })
         try {
-          await Promise.all(
+          await Promise.allSettled(
             Object.values(grupos).map(grupo => {
               const principal = grupo[0]
               const e = mpEdits[principal.ID]

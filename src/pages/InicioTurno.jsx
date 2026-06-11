@@ -274,11 +274,14 @@ export default function InicioTurno() {
             ))
           } else {
             // PCP fue primero → guardar lo que el operario declaró recibir
-            // Cargamos las entradas actuales para hacer el match por Insumo
-            const kardexActual = await getListItems(token, 'Kardex_MP', { top: 200 })
-            const kardexOF = kardexActual.filter(k => k.Numero_OF === numeroOF)
+            // Filtrar por OF para reducir payload y lag
+            const kardexActual = await getListItems(token, 'Kardex_MP', {
+              filter: `Numero_OF eq '${numeroOF}'`, top: 100,
+            })
+            const kardexOF = kardexActual
 
-            await Promise.all(filasValidasMP.map(async f => {
+            // Promise.allSettled: cada entrada se intenta de forma independiente
+            await Promise.allSettled(filasValidasMP.map(async f => {
               const prodCodigoFila = resolverCodigo(f.producto)
               // Priorizar match exacto por Insumo + Producto; fallback a solo Insumo
               const matching =
