@@ -268,6 +268,7 @@ export default function CierreTurno() {
       UnidadesDefectuosas: undDefectuosas,
       Estado_Validacion:   estadoValidacion,
       Paradas:             turnoActivo.Paradas || '[]',
+      Se_Transfiere:       transferenciaPendiente === true,
       // MP — campos principales del registro de producción
       MP_KgUsado:          parseFloat(mpBaseTotal.toFixed(3)),
       Insumo_Base:         insumoBaseNombre,

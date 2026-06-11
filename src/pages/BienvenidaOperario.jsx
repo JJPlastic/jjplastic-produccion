@@ -156,6 +156,9 @@ export default function BienvenidaOperario() {
     const saldo = kg - (k.KgUsado || 0) - (k.KgMermaRec || 0) - (k.KgMermaNoRec || 0) - (k.KgDevueltos || 0)
     return saldo > 0.01
   })
+  // Si el último turno fue cerrado con "se transfiere", la OF pasa a otra máquina
+  const fueTransferida = ultimoReg?.Se_Transfiere === true
+  const puedeContinuar = haySaldoMP && !fueTransferida
 
   return (
     <div style={{
@@ -314,24 +317,24 @@ export default function BienvenidaOperario() {
                   setPantalla('cambio-producto')
                   setCargandoReg(null)
                 }}
-                disabled={!!cargandoReg || !haySaldoMP}
-                title={!haySaldoMP ? 'Sin saldo de MP disponible en Kardex para esta OF' : ''}
+                disabled={!!cargandoReg || !puedeContinuar}
+                title={fueTransferida ? 'La OF fue transferida a otra máquina' : !haySaldoMP ? 'Sin saldo de MP disponible en Kardex para esta OF' : ''}
                 style={{
                   width: '100%',
-                  background: haySaldoMP
+                  background: puedeContinuar
                     ? 'linear-gradient(135deg, #37BEEC, #0288d1)'
                     : '#bdbdbd',
                   color: 'white', border: 'none', borderRadius: '10px',
                   padding: '14px', fontSize: '14px', fontWeight: 700,
-                  minHeight: '50px', cursor: haySaldoMP ? 'pointer' : 'not-allowed',
-                  opacity: haySaldoMP ? 1 : 0.65,
+                  minHeight: '50px', cursor: puedeContinuar ? 'pointer' : 'not-allowed',
+                  opacity: puedeContinuar ? 1 : 0.65,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 }}>
                 {cargandoReg === 'relevo' ? '⏳' : '🔄'} Continuar mismo producto
               </button>
-              {!haySaldoMP && kardexUltimaOF.length > 0 && (
+              {!puedeContinuar && (
                 <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0', textAlign: 'center' }}>
-                  Sin saldo de MP disponible en Kardex
+                  {fueTransferida ? 'OF transferida a otra máquina' : 'Sin saldo de MP disponible en Kardex'}
                 </p>
               )}
 
