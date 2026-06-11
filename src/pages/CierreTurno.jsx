@@ -234,10 +234,10 @@ export default function CierreTurno() {
       // MP — campos principales del registro de producción
       MP_KgUsado:          parseFloat(mpBaseTotal.toFixed(3)),
       Insumo_Base:         insumoBaseNombre,
-      Transferencia_Pendiente: transferenciaPendiente === true,
     }
     // Nivel 3 — analíticos: pueden no existir todavía
     const p3 = {
+      Transferencia_Pendiente: transferenciaPendiente === true,
       GruposConformes:       gruposConf,
       UnidadesSueltas:       undSueltas,
       Tiempo_Turno_Min:      tiempoTurnoMin,
