@@ -237,7 +237,6 @@ export default function CierreTurno() {
     }
     // Nivel 3 — analíticos: pueden no existir todavía
     const p3 = {
-      Transferencia_Pendiente: transferenciaPendiente === true,
       GruposConformes:       gruposConf,
       UnidadesSueltas:       undSueltas,
       Tiempo_Turno_Min:      tiempoTurnoMin,
