@@ -268,7 +268,7 @@ export default function CierreTurno() {
       UnidadesDefectuosas: undDefectuosas,
       Estado_Validacion:   estadoValidacion,
       Paradas:             turnoActivo.Paradas || '[]',
-      Se_Transfiere:       transferenciaPendiente === true,
+      Transferencia_Pendiente: transferenciaPendiente === true,
       // MP — campos principales del registro de producción
       MP_KgUsado:          parseFloat(mpBaseTotal.toFixed(3)),
       Insumo_Base:         insumoBaseNombre,
@@ -567,6 +567,14 @@ export default function CierreTurno() {
                             <span style={{ backgroundColor: 'rgba(255,200,0,0.35)', borderRadius: '4px', padding: '0 5px' }}>
                               Op: {k.KgDeclaradoOperario} kg
                             </span>
+                          )}
+                          {transferenciaPendiente === true && (
+                            <span style={{
+                              backgroundColor: 'rgba(255,255,255,0.2)',
+                              border: '1px solid rgba(255,255,255,0.55)',
+                              borderRadius: '10px', padding: '1px 8px',
+                              fontSize: '11px', fontWeight: 700,
+                            }}>→ Transferencia solicitada</span>
                           )}
                         </div>
                         {kgYaReg > 0 && (
