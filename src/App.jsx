@@ -17,6 +17,7 @@ const KardexMP       = lazy(() => import('./pages/pcp/KardexMP'))
 const CambioProducto      = lazy(() => import('./pages/CambioProducto'))
 const OpcionesTurno       = lazy(() => import('./pages/OpcionesTurno'))
 const BienvenidaOperario  = lazy(() => import('./pages/BienvenidaOperario'))
+const DashboardGerencia   = lazy(() => import('./pages/gerencia/DashboardGerencia'))
 
 const Login = () => {
   const { login } = useMsal()
@@ -103,6 +104,7 @@ const SelectorRol = () => {
         {[
           { rol: 'operario', icon: '🏭', label: 'Operario', desc: 'Registro de producción en planta', color: '#F8A12F', colorDk: '#e6901e' },
           { rol: 'pcp', icon: '📋', label: 'PCP / Supervisor', desc: 'Validación y Kardex de MP', color: '#37BEEC', colorDk: '#0288d1' },
+          { rol: 'gerencia', icon: '📊', label: 'Gerencia', desc: 'Panel de producción en tiempo real', color: '#7b1fa2', colorDk: '#4a148c' },
         ].map(({ rol, icon, label, desc, color, colorDk }) => (
           <button key={rol} onClick={() => seleccionarRol(rol)} style={{
             background: `linear-gradient(135deg, ${color}, ${colorDk})`,
@@ -160,7 +162,14 @@ const RouterPCP = () => {
 }
 
 // Roles que van a pantallas PCP/supervisión
-const ROLES_PCP = ['pcp', 'bi', 'jefeoperaciones', 'gerencia']
+const ROLES_PCP = ['pcp', 'bi', 'jefeoperaciones']
+
+// Router Gerencia
+const RouterGerencia = () => (
+  <Suspense fallback={<LoadingSpinner mensaje="Cargando..." />}>
+    <DashboardGerencia />
+  </Suspense>
+)
 
 const Router = () => {
   const { pantalla, cargandoInicial, rol, seleccionarRol } = useApp()
@@ -200,6 +209,7 @@ const Router = () => {
 
   if (cargandoInicial || detectando) return <LoadingSpinner mensaje="Verificando acceso..." />
   if (!rol) return <SelectorRol />
+  if (rol === 'gerencia') return <RouterGerencia />
   if (ROLES_PCP.includes(rol)) return <RouterPCP />  // PCP/Jefe/BI → nunca necesitan seleccionar máquina
 
   // Solo operarios necesitan tablet configurada (permanente o temporal de sesión)

@@ -78,6 +78,28 @@ export default function InicioTurno() {
   const eliminarFilaMP = (id) => setFilasMP(p => p.length > 1 ? p.filter(f => f.id !== id) : p)
   const updateFilaMP   = (id, campo, val) => setFilasMP(p => p.map(f => f.id === id ? { ...f, [campo]: val } : f))
 
+  // Sin OF: lista de productos declarados por el operario
+  const [productosLibres, setProductosLibres] = useState([])
+  const [nuevoProductoVal, setNuevoProductoVal] = useState('')
+  const agregarProductoLibre = (codigo) => {
+    if (!codigo || productosLibres.some(p => p.codigo === codigo)) return
+    setProductosLibres(prev => [...prev, { id: crypto.randomUUID(), codigo }])
+    setFilasMP(prev => {
+      // Si solo hay la fila vacía inicial, reemplazarla
+      if (prev.length === 1 && !prev[0].mp && !prev[0].kg && !prev[0].producto)
+        return [{ id: crypto.randomUUID(), mp: '', kg: '', producto: codigo }]
+      return [...prev, { id: crypto.randomUUID(), mp: '', kg: '', producto: codigo }]
+    })
+    setNuevoProductoVal('')
+  }
+  const eliminarProductoLibre = (id, codigo) => {
+    setProductosLibres(prev => prev.filter(p => p.id !== id))
+    setFilasMP(prev => {
+      const restantes = prev.filter(f => f.producto !== codigo)
+      return restantes.length > 0 ? restantes : [{ id: crypto.randomUUID(), mp: '', kg: '', producto: '' }]
+    })
+  }
+
   const resolverNombre = (codigo) => {
     const p = productos.find(x => (x.Codigo || '') === codigo || (x.Nombre || x.Title || '') === codigo)
     return p ? (p.Nombre || p.Title || codigo) : codigo
@@ -150,6 +172,15 @@ export default function InicioTurno() {
       setFilasMP([{ id: crypto.randomUUID(), mp: '', kg: '', producto: '' }])
     }
   }, [ofSeleccionada?.of])
+
+  // Sin OF: auto-seleccionar producto cuando hay exactamente 1; limpiar cuando se borran todos
+  useEffect(() => {
+    if (ofSeleccionada) return
+    if (productosLibres.length === 1)
+      setValue('Producto', productosLibres[0].codigo, { shouldValidate: true })
+    else if (productosLibres.length === 0)
+      setValue('Producto', '', { shouldValidate: false })
+  }, [productosLibres.length, ofSeleccionada?.of])
 
   // Auto-seleccionar operario cuyo Email coincida con la cuenta M365 logueada
   useEffect(() => {
@@ -474,12 +505,51 @@ export default function InicioTurno() {
                     </div>
                   )}
 
-                  {/* Sin OF → SearchSelect libre */}
+                  {/* Sin OF → multi-producto con radio "inicio con este" */}
                   {!ofSeleccionada && (
-                    <SearchSelect opciones={productos.map(p => {
-                      const nombre = p.Nombre || p.Title || ''; const codigo = p.Codigo || ''
-                      return { value: codigo || nombre, label: nombre + (codigo ? ` (${codigo})` : '') }
-                    })} value={watch('Producto')} onChange={v => setValue('Producto', v, { shouldValidate: true })} placeholder="Buscar producto..." />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {productosLibres.length > 1 && (
+                        <p style={{ fontSize: '12px', color: '#666', margin: 0, fontWeight: 600 }}>
+                          ¿Con qué producto empiezas?
+                        </p>
+                      )}
+                      {productosLibres.map(pObj => {
+                        const sel = watch('Producto') === pObj.codigo
+                        return (
+                          <button key={pObj.id} type="button"
+                            onClick={() => setValue('Producto', pObj.codigo, { shouldValidate: true })}
+                            style={{
+                              padding: '11px 14px', borderRadius: '10px', border: '2px solid',
+                              borderColor: sel ? '#2e7d32' : '#e0e0e0',
+                              backgroundColor: sel ? '#f0fff4' : '#fafafa',
+                              color: sel ? '#2e7d32' : '#555',
+                              fontWeight: sel ? 800 : 500, fontSize: '14px',
+                              cursor: 'pointer', textAlign: 'left',
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                            }}>
+                            <span style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${sel ? '#2e7d32' : '#ccc'}`, backgroundColor: sel ? '#2e7d32' : 'white', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {sel && <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'white' }} />}
+                            </span>
+                            <span style={{ flex: 1 }}>{resolverNombre(pObj.codigo)}</span>
+                            <span
+                              role="button"
+                              onClick={e => { e.stopPropagation(); eliminarProductoLibre(pObj.id, pObj.codigo) }}
+                              style={{ fontSize: '18px', color: '#bbb', padding: '0 2px', lineHeight: 1, cursor: 'pointer' }}>×</span>
+                          </button>
+                        )
+                      })}
+                      <SearchSelect
+                        opciones={productos
+                          .filter(p => !productosLibres.some(pl => pl.codigo === (p.Codigo || p.Nombre || p.Title || '')))
+                          .map(p => {
+                            const nombre = p.Nombre || p.Title || ''; const codigo = p.Codigo || ''
+                            return { value: codigo || nombre, label: nombre + (codigo ? ` (${codigo})` : '') }
+                          })}
+                        value={nuevoProductoVal}
+                        onChange={v => agregarProductoLibre(v)}
+                        placeholder={productosLibres.length === 0 ? 'Buscar producto...' : '+ Agregar otro producto...'}
+                      />
+                    </div>
                   )}
                   {errors.Producto && <p style={{ color: '#d32f2f', fontSize: '11px', marginTop: '4px' }}>{errors.Producto.message}</p>}
                 </div>

@@ -791,16 +791,20 @@ export default function KardexMP({ onVolver, onLogout }) {
               return matchFecha && matchTurno
             })
 
-            // Agrupar por Maquina + OF + Fecha + Turno
+            // Agrupar por OF + Fecha (con OF) o Máquina + Fecha (sin OF)
             const grupos = {}
             filtradas.forEach(e => {
-              const f    = (e.Fecha || '').split('T')[0]
-              const of   = e.Numero_OF || 'sin-OF'
-              const key  = `${e.Title || ''}|${of}|${f}|${e.Turno || ''}`
+              const f   = (e.Fecha || '').split('T')[0]
+              const of  = e.Numero_OF || ''
+              const key = of ? `OF|${of}|${f}` : `MAQ|${e.Title || ''}|${f}`
               if (!grupos[key]) grupos[key] = {
-                key, maquina: e.Title || '—', fecha: f, turno: e.Turno,
-                numeroOF: e.Numero_OF || null, items: [],
+                key, numeroOF: of || null, fecha: f,
+                maquinasMap: {}, items: [],
               }
+              const maq = e.Title || '—'
+              if (!grupos[key].maquinasMap[maq])
+                grupos[key].maquinasMap[maq] = { maquina: maq, turno: e.Turno, items: [] }
+              grupos[key].maquinasMap[maq].items.push(e)
               grupos[key].items.push(e)
             })
             const lista = Object.values(grupos)
@@ -811,281 +815,208 @@ export default function KardexMP({ onVolver, onLogout }) {
               </p>
             )
 
+            // Helper: renderiza items de un sub-grupo de máquina (misma lógica que antes)
+            const renderItemsMaquina = (subGrupo) => {
+              const porProducto = {}
+              subGrupo.items.forEach(e => {
+                const prodKey = (e.Producto || '').trim() || '(sin producto)'
+                if (!porProducto[prodKey]) porProducto[prodKey] = []
+                porProducto[prodKey].push(e)
+              })
+              return Object.keys(porProducto).map((prodNombre, pIdx) => {
+                const itemsProd = porProducto[prodNombre]
+                const porInsumo = {}
+                itemsProd.forEach(e => {
+                  const k = (e.Insumo || '—').trim().toLowerCase()
+                  if (!porInsumo[k]) porInsumo[k] = []
+                  porInsumo[k].push(e)
+                })
+                const totalProd = itemsProd.reduce((s, e) => s + (e.KgEntregados || 0), 0)
+                return (
+                  <div key={prodNombre} style={{ borderTop: pIdx > 0 ? '2px solid #e8f0fb' : 'none' }}>
+                    <div style={{ backgroundColor: '#f0f4ff', padding: '6px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#004895' }}>
+                        {prodNombre === '(sin producto)' ? '—' : resolverNombreMaestro(prodNombre)}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#555' }}>{totalProd.toFixed(2)} kg</span>
+                    </div>
+                    {Object.entries(porInsumo).map(([, entries], gIdx) => {
+                      const nombre = entries[0].Insumo || '—'
+                      const totalKg = entries.reduce((s, e) => {
+                        const pendiente = e.Observacion?.includes('operario') && !yaValidado(e.Observacion)
+                        return s + (pendiente ? (e.KgDeclaradoOperario || e.KgEntregados || 0) : (e.KgEntregados || 0))
+                      }, 0)
+                      const totalDevE = entries.reduce((s, e) => s + (e.KgDevueltos || 0), 0)
+                      const tieneOp = entries.some(e => e.Observacion?.includes('operario'))
+                      return (
+                        <div key={nombre} style={{ padding: '12px 16px', borderTop: gIdx > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div>
+                              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{resolverNombreMaestro(nombre)}</span>
+                              {tieneOp && <span style={{ marginLeft: '8px', backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>OP</span>}
+                            </div>
+                            <span style={{ fontSize: '16px', fontWeight: 700, color: '#004895' }}>
+                              {totalKg.toFixed(2)} kg
+                              {totalDevE > 0 && <span style={{ fontSize: '12px', color: '#f57f17', marginLeft: '6px' }}>−{totalDevE.toFixed(2)}</span>}
+                            </span>
+                          </div>
+                          {entries.map((e, eIdx) => {
+                            const hayDisc = e.KgDeclaradoOperario != null && Math.abs((e.KgDeclaradoOperario || 0) - (e.KgEntregados || 0)) > 0.01
+                            const esOp = e.Observacion?.includes('operario') || hayDisc
+                            const esPcpAd = e.Observacion === 'MP adicional'
+                            const pendienteOp = esOp && !yaValidado(e.Observacion)
+                            const delta = pendienteOp ? (e.KgDeclaradoOperario || 0) - (e.KgEntregados || 0) : 0
+                            const kgEnt = pendienteOp ? (e.KgDeclaradoOperario || 0) : (e.KgEntregados || e.KgDeclaradoOperario || 0)
+                            const bc = esOp ? { bg: '#fff3e0', text: '#e65100' } : esPcpAd ? { bg: '#e3f2fd', text: '#1565c0' } : { bg: '#f3f4f6', text: '#555' }
+                            const bl = esOp ? 'Operario' : esPcpAd ? 'PCP adicional' : 'PCP'
+                            return (
+                              <div key={e.ID} style={{ marginTop: eIdx > 0 ? '6px' : 0, borderLeft: `3px solid ${bc.bg === '#f3f4f6' ? '#e0e0e0' : bc.bg}`, paddingLeft: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ backgroundColor: bc.bg, color: bc.text, borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 700 }}>{bl}</span>
+                                    <span style={{ fontSize: '13px', color: '#333' }}>{kgEnt} kg</span>
+                                    {pendienteOp && delta > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#e65100', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>+{delta.toFixed(2)} kg a validar</span>}
+                                    {e.KgDevueltos > 0 && <span style={{ fontSize: '11px', color: '#f57f17' }}>↩ {e.KgDevueltos} dev.</span>}
+                                    {esOp && !yaValidado(e.Observacion) && (
+                                      <button type="button" onClick={() => validarEntrada(e)} style={{ backgroundColor: '#e8f0fb', color: '#004895', border: '1px solid #90caf9', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>✓ Validar</button>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <button type="button" onClick={() => { setEditEntradaId(editEntradaId === e.ID ? null : e.ID); setEditEntrada({ KgEntregados: e.KgEntregados }) }} style={{ backgroundColor: '#f5f5f5', border: '1px solid #e0e0e0', color: '#555', borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>✏ Editar</button>
+                                    <button type="button" onClick={() => { setEditDevId(editDevId === e.ID ? null : e.ID); setEditDevKg(String(e.KgDevueltos || 0)) }} style={{ backgroundColor: '#fff8f0', border: '1px solid #ffcc80', color: '#f57f17', borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>↩ Dev.</button>
+                                  </div>
+                                </div>
+                                {editEntradaId === e.ID && (
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#555', whiteSpace: 'nowrap' }}>Kg entregados:</span>
+                                    <input type="number" step="0.01" min="0" value={editEntrada.KgEntregados ?? ''} onChange={ev => setEditEntrada(p => ({ ...p, KgEntregados: ev.target.value }))} autoFocus style={{ ...inp, flex: 1, padding: '5px 8px', textAlign: 'right', fontWeight: 700, fontSize: '13px' }} />
+                                    <button onClick={() => guardarEdicionEntrada(e.ID)} disabled={guardandoEntrada} style={{ backgroundColor: '#004895', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{guardandoEntrada ? '...' : '✓'}</button>
+                                    <button onClick={() => setEditEntradaId(null)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', color: '#666', cursor: 'pointer' }}>✕</button>
+                                  </div>
+                                )}
+                                {editDevId === e.ID && (
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#555', whiteSpace: 'nowrap' }}>Kg devueltos:</span>
+                                    <input type="number" step="0.01" min="0" value={editDevKg} onChange={ev => setEditDevKg(ev.target.value)} autoFocus style={{ ...inp, flex: 1, padding: '5px 8px', textAlign: 'right', fontWeight: 700, fontSize: '13px' }} />
+                                    <button onClick={() => guardarDevolucion(e.ID)} disabled={guardandoDev} style={{ backgroundColor: '#004895', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{guardandoDev ? '...' : '✓'}</button>
+                                    <button onClick={() => setEditDevId(null)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', color: '#666', cursor: 'pointer' }}>✕</button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            }
+
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {lista.map(grupo => {
-                  const totalEnt = grupo.items.reduce((s, i) => s + (i.KgEntregados || 0), 0)
-                  const totalDev = grupo.items.reduce((s, i) => s + (i.KgDevueltos || 0), 0)
-                  const neto = totalEnt - totalDev
-                  const abierto = gruposAbiertos[grupo.key] === true
+                  const totalEnt  = grupo.items.reduce((s, i) => s + (i.KgEntregados || 0), 0)
+                  const totalDev  = grupo.items.reduce((s, i) => s + (i.KgDevueltos  || 0), 0)
+                  const netoTotal = totalEnt - totalDev
+                  const abierto   = gruposAbiertos[grupo.key] === true
 
-                  // Estado del grupo para el badge esquina
-                  const tieneOpSinValidar = grupo.items.some(i => {
-                    // Caso 1: entrada marcada explícitamente por operario
-                    if (i.Observacion?.includes('operario') && !yaValidado(i.Observacion)) return true
-                    // Caso 2: KgDeclaradoOperario difiere de KgEntregados (operario declaró diferente)
-                    if (i.KgDeclaradoOperario != null &&
-                        Math.abs((i.KgDeclaradoOperario || 0) - (i.KgEntregados || 0)) > 0.01 &&
-                        !yaValidado(i.Observacion)) return true
-                    return false
-                  })
-                  const todosValidados = grupo.items.length > 0 &&
-                    grupo.items.every(i => yaValidado(i.Observacion))
-                  const grupoEstado = todosValidados ? 'validado'
-                    : tieneOpSinValidar ? 'operario' : null
-
-                  // Transferencia pendiente (operario lo marcó al cerrar turno)
+                  const tieneOpSinValidar = grupo.items.some(i =>
+                    (i.Observacion?.includes('operario') && !yaValidado(i.Observacion)) ||
+                    (i.KgDeclaradoOperario != null && Math.abs((i.KgDeclaradoOperario || 0) - (i.KgEntregados || 0)) > 0.01 && !yaValidado(i.Observacion))
+                  )
+                  const todosValidados = grupo.items.length > 0 && grupo.items.every(i => yaValidado(i.Observacion))
                   const tieneTransfPendiente = grupo.numeroOF && ofsConTransferencia.has(grupo.numeroOF)
-
-                  // Colores según estado
-                  const bgHeader = tieneOpSinValidar ? '#e65100' : tieneTransfPendiente ? '#0277bd' : '#004895'
+                  const bgHeader    = tieneOpSinValidar ? '#e65100' : tieneTransfPendiente ? '#0277bd' : '#004895'
                   const borderColor = tieneOpSinValidar ? '#ff9800' : tieneTransfPendiente ? '#81d4fa' : '#90caf9'
+                  const maquinasArr = Object.values(grupo.maquinasMap)
 
                   return (
-                    <div key={grupo.key} style={{
-                      borderRadius: '12px',
-                      border: `1.5px solid ${borderColor}`,
-                      overflow: 'hidden',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                    }}>
-                      {/* Cabecera */}
-                      <div
-                        onClick={() => toggleGrupo(grupo.key)}
-                        style={{ backgroundColor: bgHeader, color: 'white', padding: '12px 14px', cursor: 'pointer' }}
-                      >
-                        {/* Fila 1: máquina + turno + kg + flecha */}
+                    <div key={grupo.key} style={{ borderRadius: '12px', border: `1.5px solid ${borderColor}`, overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
+                      {/* Cabecera OF */}
+                      <div onClick={() => toggleGrupo(grupo.key)} style={{ backgroundColor: bgHeader, color: 'white', padding: '12px 14px', cursor: 'pointer' }}>
+                        {/* Fila 1: OF + kg + flecha */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {grupo.numeroOF
+                            ? <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}>🔖 {grupo.numeroOF}</span>
+                            : <strong style={{ fontSize: '15px' }}>{maquinasArr[0]?.maquina || '—'}</strong>
+                          }
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <strong style={{ fontSize: '16px' }}>{grupo.maquina}</strong>
-                            <span style={{ fontSize: '12px', opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: '6px', padding: '1px 8px' }}>
-                              Turno {grupo.turno}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <strong style={{ fontSize: '18px' }}>{neto.toFixed(2)} kg</strong>
+                            <strong style={{ fontSize: '17px' }}>{netoTotal.toFixed(2)} kg</strong>
                             <span style={{ opacity: 0.6, fontSize: '16px' }}>{abierto ? '▲' : '▼'}</span>
                           </div>
                         </div>
-                        {/* Fila 1b: fecha sola */}
-                        <div style={{ marginTop: '3px' }}>
-                          <span style={{ fontSize: '12px', opacity: 0.7 }}>
-                            {grupo.fecha ? format(new Date(grupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
-                          </span>
-                        </div>
-
-                        {/* Fila 2: OF + desglose + badge */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                          <div style={{ fontSize: '11px', opacity: 0.75, display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                            {grupo.numeroOF && (
-                              <span style={{ fontFamily: 'monospace' }}>🔖 {grupo.numeroOF}</span>
-                            )}
-                            {totalDev > 0 && (
-                              <span>{totalEnt} ent. − {totalDev} dev.</span>
-                            )}
+                        {/* Fila 2: máquinas + fecha + desglose + badges */}
+                        <div style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {maquinasArr.map(s => (
+                              <span key={s.maquina} style={{ fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: '6px', padding: '1px 8px' }}>
+                                {s.maquina} · T{s.turno}
+                              </span>
+                            ))}
+                            <span style={{ fontSize: '11px', opacity: 0.6 }}>
+                              {grupo.fecha ? format(new Date(grupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                              {totalDev > 0 && <span style={{ marginLeft: '6px' }}>{totalEnt.toFixed(2)} ent. − {totalDev.toFixed(2)} dev.</span>}
+                            </span>
                           </div>
-                          {/* Badge estado */}
-                          {grupoEstado === 'validado' && (
-                            <span style={{
-                              backgroundColor: 'rgba(255,255,255,0.2)',
-                              border: '1px solid rgba(255,255,255,0.5)',
-                              borderRadius: '10px', padding: '2px 10px',
-                              fontSize: '11px', fontWeight: 700,
-                            }}>✓ Validado PCP</span>
-                          )}
-                          {tieneOpSinValidar && (
-                            <span style={{
-                              backgroundColor: 'rgba(255,255,255,0.2)',
-                              border: '1px solid rgba(255,255,255,0.5)',
-                              borderRadius: '10px', padding: '2px 10px',
-                              fontSize: '11px', fontWeight: 700,
-                            }}>👤 Por operario · pendiente validación</span>
-                          )}
-                          {tieneTransfPendiente && (
-                            <span style={{
-                              backgroundColor: 'rgba(255,255,255,0.2)',
-                              border: '1px solid rgba(255,255,255,0.5)',
-                              borderRadius: '10px', padding: '2px 10px',
-                              fontSize: '11px', fontWeight: 700,
-                            }}>→ Transferencia pendiente</span>
-                          )}
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {todosValidados && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>✓ Validado PCP</span>}
+                            {tieneOpSinValidar && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>👤 Por operario · pendiente validación</span>}
+                            {tieneTransfPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>→ Transferencia pendiente</span>}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Items del grupo — agrupados por producto, luego por insumo */}
+                      {/* Sub-secciones por máquina */}
                       {abierto && (
                         <div style={{ backgroundColor: 'white' }}>
-                          {(() => {
-                            // Agrupar por producto primero
-                            const porProducto = {}
-                            grupo.items.forEach(e => {
-                              const prodKey = (e.Producto || '').trim() || '(sin producto)'
-                              if (!porProducto[prodKey]) porProducto[prodKey] = []
-                              porProducto[prodKey].push(e)
-                            })
-                            const productosKeys = Object.keys(porProducto)
-                            return productosKeys.map((prodNombre, pIdx) => {
-                              const itemsProd = porProducto[prodNombre]
-                              // Agrupar por insumo dentro del producto
-                              const porInsumo = {}
-                              itemsProd.forEach(e => {
-                                const key = (e.Insumo || '—').trim().toLowerCase()
-                                if (!porInsumo[key]) porInsumo[key] = []
-                                porInsumo[key].push(e)
-                              })
-                              const totalProd = itemsProd.reduce((s, e) => s + (e.KgEntregados || 0), 0)
-                              return (
-                                <div key={prodNombre} style={{ borderTop: pIdx > 0 ? '2px solid #e8f0fb' : 'none' }}>
-                                  {/* Sub-cabecera de producto */}
-                                  <div style={{ backgroundColor: '#f0f4ff', padding: '6px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#004895' }}>
-                                      {prodNombre === '(sin producto)' ? '—' : resolverNombreMaestro(prodNombre)}
-                                    </span>
-                                    <span style={{ fontSize: '12px', color: '#555' }}>{totalProd.toFixed(2)} kg</span>
-                                  </div>
-                                  {Object.entries(porInsumo).map(([, entries], gIdx) => {
-                                    const nombre = entries[0].Insumo || '—'
-                                    const totalKg = entries.reduce((s, e) => {
-                                      const pendiente = e.Observacion?.includes('operario') && !yaValidado(e.Observacion)
-                                      const kg = pendiente ? (e.KgDeclaradoOperario || e.KgEntregados || 0) : (e.KgEntregados || 0)
-                                      return s + kg
-                                    }, 0)
-                                    const totalDev = entries.reduce((s, e) => s + (e.KgDevueltos || 0), 0)
-                                    const tieneOp = entries.some(e => e.Observacion?.includes('operario'))
-                                    return (
-                                      <div key={nombre} style={{ padding: '12px 16px', borderTop: gIdx > 0 ? '1px solid #f0f0f0' : 'none' }}>
-
-                                  {/* Fila principal: nombre + total */}
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: entries.length > 0 ? '8px' : 0 }}>
-                                    <div>
-                                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{resolverNombreMaestro(nombre)}</span>
-                                      {tieneOp && (
-                                        <span style={{ marginLeft: '8px', backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>OP</span>
-                                      )}
+                          {maquinasArr.map((subGrupo, sIdx) => {
+                            const subEnt = subGrupo.items.reduce((s, i) => s + (i.KgEntregados || 0), 0)
+                            const subDev = subGrupo.items.reduce((s, i) => s + (i.KgDevueltos  || 0), 0)
+                            const subNeto = subEnt - subDev
+                            const yaProdujo  = grupo.numeroOF && ofsConRegistro.has(grupo.numeroOF)
+                            const hayMpUsada = subGrupo.items.some(e => (e.KgUsado || 0) > 0)
+                            return (
+                              <div key={subGrupo.maquina} style={{ borderTop: sIdx > 0 ? '3px solid #e8f0fb' : 'none' }}>
+                                {/* Cabecera de máquina (solo si hay más de una) */}
+                                {maquinasArr.length > 1 && (
+                                  <div style={{ backgroundColor: '#e8f0fb', padding: '6px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <strong style={{ fontSize: '13px', color: '#004895' }}>{subGrupo.maquina}</strong>
+                                      <span style={{ fontSize: '11px', color: '#555', backgroundColor: 'white', borderRadius: '4px', padding: '1px 7px' }}>Turno {subGrupo.turno}</span>
                                     </div>
-                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#004895' }}>
-                                      {totalKg.toFixed(2)} kg
-                                      {totalDev > 0 && <span style={{ fontSize: '12px', color: '#f57f17', marginLeft: '6px' }}>−{totalDev.toFixed(2)}</span>}
-                                    </span>
+                                    <span style={{ fontSize: '13px', fontWeight: 700, color: subNeto < 0.1 ? '#aaa' : '#004895' }}>{subNeto.toFixed(2)} kg neto</span>
                                   </div>
-
-                                  {/* Entradas individuales — compactas */}
-                                  {entries.map((e, eIdx) => {
-                                    const hayDiscrepancia = e.KgDeclaradoOperario != null &&
-                                      Math.abs((e.KgDeclaradoOperario || 0) - (e.KgEntregados || 0)) > 0.01
-                                    const esOp = e.Observacion?.includes('operario') || hayDiscrepancia
-                                    const esPcpAd = e.Observacion === 'MP adicional'
-                                    const pendienteOp = esOp && !yaValidado(e.Observacion)
-                                    // Delta = lo nuevo que el operario declaró (aún no en KgEntregados)
-                                    const delta = pendienteOp
-                                      ? (e.KgDeclaradoOperario || 0) - (e.KgEntregados || 0)
-                                      : 0
-                                    const kgEntrada = pendienteOp
-                                      ? (e.KgDeclaradoOperario || 0)
-                                      : (e.KgEntregados || e.KgDeclaradoOperario || 0)
-                                    const badgeColor = esOp ? { bg: '#fff3e0', text: '#e65100' } : esPcpAd ? { bg: '#e3f2fd', text: '#1565c0' } : { bg: '#f3f4f6', text: '#555' }
-                                    const badgeLabel = esOp ? 'Operario' : esPcpAd ? 'PCP adicional' : 'PCP'
-                                    return (
-                                      <div key={e.ID} style={{ marginTop: eIdx > 0 ? '6px' : 0, borderLeft: `3px solid ${badgeColor.bg === '#f3f4f6' ? '#e0e0e0' : badgeColor.bg}`, paddingLeft: '10px' }}>
-                                        {/* Fila de entrada */}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ backgroundColor: badgeColor.bg, color: badgeColor.text, borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 700 }}>{badgeLabel}</span>
-                                            <span style={{ fontSize: '13px', color: '#333' }}>{kgEntrada} kg</span>
-                                            {pendienteOp && delta > 0 && (
-                                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#e65100', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>
-                                                +{delta.toFixed(2)} kg a validar
-                                              </span>
-                                            )}
-                                            {e.KgDevueltos > 0 && <span style={{ fontSize: '11px', color: '#f57f17' }}>↩ {e.KgDevueltos} dev.</span>}
-                                            {esOp && !yaValidado(e.Observacion) && (
-                                              <button type="button" onClick={() => validarEntrada(e)}
-                                                style={{ backgroundColor: '#e8f0fb', color: '#004895', border: '1px solid #90caf9', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>✓ Validar</button>
-                                            )}
-                                          </div>
-                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                            <button type="button" onClick={() => { setEditEntradaId(editEntradaId === e.ID ? null : e.ID); setEditEntrada({ KgEntregados: e.KgEntregados }) }}
-                                              style={{ backgroundColor: '#f5f5f5', border: '1px solid #e0e0e0', color: '#555', borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>✏ Editar</button>
-                                            <button type="button" onClick={() => { setEditDevId(editDevId === e.ID ? null : e.ID); setEditDevKg(String(e.KgDevueltos || 0)) }}
-                                              style={{ backgroundColor: '#fff8f0', border: '1px solid #ffcc80', color: '#f57f17', borderRadius: '4px', padding: '1px 7px', fontSize: '10px', fontWeight: 600, cursor: 'pointer' }}>↩ Dev.</button>
-                                          </div>
-                                        </div>
-                                        {/* Edición inline */}
-                                        {editEntradaId === e.ID && (
-                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
-                                            <span style={{ fontSize: '11px', color: '#555', whiteSpace: 'nowrap' }}>Kg entregados:</span>
-                                            <input type="number" step="0.01" min="0" value={editEntrada.KgEntregados ?? ''} onChange={ev => setEditEntrada(p => ({ ...p, KgEntregados: ev.target.value }))} autoFocus style={{ ...inp, flex: 1, padding: '5px 8px', textAlign: 'right', fontWeight: 700, fontSize: '13px' }} />
-                                            <button onClick={() => guardarEdicionEntrada(e.ID)} disabled={guardandoEntrada} style={{ backgroundColor: '#004895', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{guardandoEntrada ? '...' : '✓'}</button>
-                                            <button onClick={() => setEditEntradaId(null)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', color: '#666', cursor: 'pointer' }}>✕</button>
-                                          </div>
-                                        )}
-                                        {/* Devolución inline */}
-                                        {editDevId === e.ID && (
-                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
-                                            <span style={{ fontSize: '11px', color: '#555', whiteSpace: 'nowrap' }}>Kg devueltos:</span>
-                                            <input type="number" step="0.01" min="0" value={editDevKg} onChange={ev => setEditDevKg(ev.target.value)} autoFocus style={{ ...inp, flex: 1, padding: '5px 8px', textAlign: 'right', fontWeight: 700, fontSize: '13px' }} />
-                                            <button onClick={() => guardarDevolucion(e.ID)} disabled={guardandoDev} style={{ backgroundColor: '#004895', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{guardandoDev ? '...' : '✓'}</button>
-                                            <button onClick={() => setEditDevId(null)} style={{ background: 'none', border: '1px solid #ddd', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', color: '#666', cursor: 'pointer' }}>✕</button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  })}
+                                )}
+                                {/* Items */}
+                                {renderItemsMaquina(subGrupo)}
+                                {/* Acciones por máquina */}
+                                <div style={{ padding: '10px 14px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    <button
+                                      onClick={() => { if (!yaProdujo) { setModalReasignar({ grupo: { ...subGrupo, numeroOF: grupo.numeroOF } }); setMaqDestinoSel('') } }}
+                                      disabled={yaProdujo}
+                                      title={yaProdujo ? 'Ya hay producción registrada — usa "Transferir kg restantes"' : 'Corregir máquina asignada'}
+                                      style={{ backgroundColor: yaProdujo ? '#f5f5f5' : '#f0f4ff', color: yaProdujo ? '#bbb' : '#004895', border: `1.5px solid ${yaProdujo ? '#e0e0e0' : '#004895'}`, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700, cursor: yaProdujo ? 'not-allowed' : 'pointer' }}>
+                                      ↔ Reasignar máquina
+                                    </button>
+                                    <button
+                                      onClick={() => { if (hayMpUsada) { setModalTransferir({ grupo: { ...subGrupo, numeroOF: grupo.numeroOF } }); setMaqDestinoSel('') } }}
+                                      disabled={!hayMpUsada}
+                                      title={!hayMpUsada ? 'Aún no se usó MP — usa "Reasignar máquina"' : 'Transferir kg no usados a otra máquina'}
+                                      style={{ backgroundColor: !hayMpUsada ? '#f5f5f5' : tieneTransfPendiente ? '#37BEEC' : '#e3f7fd', color: !hayMpUsada ? '#bbb' : tieneTransfPendiente ? 'white' : '#0288d1', border: `1.5px solid ${!hayMpUsada ? '#e0e0e0' : tieneTransfPendiente ? '#37BEEC' : '#0288d1'}`, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700, cursor: !hayMpUsada ? 'not-allowed' : 'pointer' }}>
+                                      → Transferir kg restantes
+                                    </button>
+                                  </div>
+                                  <button
+                                    onClick={() => { setModalAdicional({ maquina: subGrupo.maquina, turno: subGrupo.turno, fecha: grupo.fecha, numeroOF: grupo.numeroOF }); setFilasAdicionales([filaVacia()]) }}
+                                    style={{ backgroundColor: 'transparent', color: '#004895', border: '1.5px solid #004895', borderRadius: '8px', padding: '5px 14px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                                    + MP adicional
+                                  </button>
                                 </div>
-                              )
-                            })}
-                          </div>
-                        )
-                      })
-                    })()}
-                          {/* Acciones del grupo */}
-                          <div style={{ padding: '10px 14px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {(() => {
-                                const yaProdujo = grupo.numeroOF && ofsConRegistro.has(grupo.numeroOF)
-                                return (
-                                  <button
-                                    onClick={() => { if (!yaProdujo) { setModalReasignar({ grupo }); setMaqDestinoSel('') } }}
-                                    disabled={yaProdujo}
-                                    title={yaProdujo ? 'Ya hay producción registrada — usa "Transferir kg restantes"' : 'Corregir máquina asignada'}
-                                    style={{
-                                      backgroundColor: yaProdujo ? '#f5f5f5' : '#f0f4ff',
-                                      color: yaProdujo ? '#bbb' : '#004895',
-                                      border: `1.5px solid ${yaProdujo ? '#e0e0e0' : '#004895'}`,
-                                      borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700,
-                                      cursor: yaProdujo ? 'not-allowed' : 'pointer',
-                                    }}>
-                                    ↔ Reasignar máquina
-                                  </button>
-                                )
-                              })()}
-                              {(() => {
-                                const hayMpUsada = grupo.items.some(e => (e.KgUsado || 0) > 0)
-                                return (
-                                  <button
-                                    onClick={() => { if (hayMpUsada) { setModalTransferir({ grupo }); setMaqDestinoSel('') } }}
-                                    disabled={!hayMpUsada}
-                                    title={!hayMpUsada ? 'Aún no se usó MP — usa "Reasignar máquina"' : 'Transferir kg no usados a otra máquina'}
-                                    style={{
-                                      backgroundColor: !hayMpUsada ? '#f5f5f5' : tieneTransfPendiente ? '#37BEEC' : '#e3f7fd',
-                                      color: !hayMpUsada ? '#bbb' : tieneTransfPendiente ? 'white' : '#0288d1',
-                                      border: `1.5px solid ${!hayMpUsada ? '#e0e0e0' : tieneTransfPendiente ? '#37BEEC' : '#0288d1'}`,
-                                      borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700,
-                                      cursor: !hayMpUsada ? 'not-allowed' : 'pointer',
-                                    }}>
-                                    → Transferir kg restantes
-                                  </button>
-                                )
-                              })()}
-                            </div>
-                            <button
-                              onClick={() => {
-                                setModalAdicional({ maquina: grupo.maquina, turno: grupo.turno, fecha: grupo.fecha, numeroOF: grupo.numeroOF })
-                                setFilasAdicionales([filaVacia()])
-                              }}
-                              style={{ backgroundColor: 'transparent', color: '#004895', border: '1.5px solid #004895', borderRadius: '8px', padding: '5px 14px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
-                              + MP adicional
-                            </button>
-                          </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>

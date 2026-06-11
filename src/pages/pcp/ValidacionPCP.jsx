@@ -747,7 +747,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
     const rank = { 'Rojo': 3, 'Amarillo': 2, 'Verde': 1, 'Sin semáforo': 0 }
     const map = {}
     registros.forEach(r => {
-      const key = `${r.Title || ''}|${r.Numero_OF || 'sin-of'}`
+      const key = r.Numero_OF || `sin-of|${r.Title || ''}`
       const est = r.Estado_Validacion || 'Sin semáforo'
       if (!map[key] || (rank[est] || 0) > (rank[map[key]] || 0)) map[key] = est
     })
@@ -755,7 +755,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
   })()
   const countPorEstado = (e) => estadosPorOf.filter(s => s === e).length
 
-  // Jerarquía: OF → Turno → Productos
+  // Jerarquía: OF → Máquina → Turno → Productos
   const ofGroups = (() => {
     const filtrados = registros.filter(r => {
       const fechaReg = (r.Fecha || r.HoraInicio || '').split('T')[0]
@@ -766,19 +766,19 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
 
     const ofMap = {}
     filtrados.forEach(r => {
-      const ofKey = `${r.Title || ''}|${r.Numero_OF || 'sin-of'}`
+      const ofKey = r.Numero_OF || `sin-of|${r.Title || ''}`
       if (!ofMap[ofKey]) {
-        ofMap[ofKey] = {
-          ofKey, maquina: r.Title || '—', numeroOF: r.Numero_OF || null,
-          turnos: {},
-        }
+        ofMap[ofKey] = { ofKey, numeroOF: r.Numero_OF || null, maquinasMap: {} }
       }
+      const maq = r.Title || '—'
+      if (!ofMap[ofKey].maquinasMap[maq])
+        ofMap[ofKey].maquinasMap[maq] = { maquina: maq, turnos: {} }
       const tk = r.Turno || 'M'
-      if (!ofMap[ofKey].turnos[tk]) {
+      if (!ofMap[ofKey].maquinasMap[maq].turnos[tk]) {
         const fecha = (r.Fecha || r.HoraInicio || '').split('T')[0]
-        ofMap[ofKey].turnos[tk] = { turno: tk, fecha, items: [] }
+        ofMap[ofKey].maquinasMap[maq].turnos[tk] = { turno: tk, fecha, items: [] }
       }
-      ofMap[ofKey].turnos[tk].items.push(r)
+      ofMap[ofKey].maquinasMap[maq].turnos[tk].items.push(r)
     })
     return Object.values(ofMap)
   })()
@@ -851,14 +851,14 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {ofGroups.map(ofGroup => {
-              const ofKey = ofGroup.ofKey
-              const abierto = gruposAbiertos[ofKey] === true
-              const todosLosItems = Object.values(ofGroup.turnos).flatMap(t => t.items)
-              const kgKardexOf = Object.values(ofGroup.turnos).reduce((s, t) => {
-                const k = kardexMap[`${ofGroup.maquina}|${ofGroup.numeroOF || ''}|${t.fecha}|${t.turno}`] ?? 0
-                return s + k
-              }, 0)
-              // Total MP realmente usada en la OF = suma de MP_KgUsado (declarado por operario)
+              const ofKey      = ofGroup.ofKey
+              const abierto    = gruposAbiertos[ofKey] === true
+              const maquinasArr = Object.values(ofGroup.maquinasMap)
+              const todosLosItems = maquinasArr.flatMap(m => Object.values(m.turnos).flatMap(t => t.items))
+
+              const kgKardexOf = maquinasArr.reduce((s, m) =>
+                s + Object.values(m.turnos).reduce((ss, t) =>
+                  ss + (kardexMap[`${m.maquina}|${ofGroup.numeroOF || ''}|${t.fecha}|${t.turno}`] ?? 0), 0), 0)
               const kgUsadoOf = todosLosItems
                 .filter(r => r.Estado === 'cerrado')
                 .reduce((s, r) => s + (r.MP_KgUsado || 0), 0)
@@ -867,7 +867,6 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
                 : todosLosItems.every(r => r.Estado_Validacion === 'Verde') ? 'Verde'
                 : null
               const cerradosOf = todosLosItems.filter(r => r.Estado === 'cerrado')
-              // "Validado PCP" solo cuando PCP revisó todos los registros Y ninguno sigue en Rojo
               const todosValidados = cerradosOf.length > 0
                 && cerradosOf.every(r => r.Fecha_Validacion)
                 && !cerradosOf.some(r => r.Estado_Validacion === 'Rojo')
@@ -882,10 +881,13 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {/* Fila 1: semáforo + máquina + productos */}
+                      {/* Fila 1: semáforo + OF + badges + kg */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         {estadoOf && <Badge estado={estadoOf} />}
-                        <strong style={{ fontSize: '14px', color: '#1a1a1a' }}>{ofGroup.maquina}</strong>
+                        {ofGroup.numeroOF
+                          ? <span style={{ fontSize: '12px', fontWeight: 700, color: '#444', fontFamily: 'monospace' }}>{ofGroup.numeroOF}</span>
+                          : <strong style={{ fontSize: '14px', color: '#1a1a1a' }}>{maquinasArr[0]?.maquina || '—'}</strong>
+                        }
                         <span style={{ fontSize: '11px', color: '#666', backgroundColor: 'rgba(0,0,0,0.06)', borderRadius: '6px', padding: '1px 6px' }}>
                           {todosLosItems.length} prod.
                         </span>
@@ -895,80 +897,93 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
                           </span>
                         )}
                       </div>
-                      {/* Fila 2: OF + kg */}
-                      {ofGroup.numeroOF && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#444', fontFamily: 'monospace' }}>{ofGroup.numeroOF}</span>
-                          {(kgUsadoOf > 0 || kgKardexOf > 0) && (
-                            <span style={{ fontSize: '11px', color: '#777' }}>
-                              {kgUsadoOf > 0 && <span style={{ color: '#1b5e20', fontWeight: 700 }}>{kgUsadoOf.toFixed(1)} kg usado</span>}
-                              {kgKardexOf > 0 && <span>{kgUsadoOf > 0 ? ' / ' : ''}{kgKardexOf.toFixed(1)} entregado</span>}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Fila 2: máquinas + kg */}
+                      <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {maquinasArr.map(m => (
+                          <span key={m.maquina} style={{ fontSize: '11px', color: '#555', backgroundColor: 'rgba(0,0,0,0.07)', borderRadius: '6px', padding: '1px 7px' }}>
+                            {m.maquina}
+                          </span>
+                        ))}
+                        {(kgUsadoOf > 0 || kgKardexOf > 0) && (
+                          <span style={{ fontSize: '11px', color: '#777' }}>
+                            {kgUsadoOf > 0 && <span style={{ color: '#1b5e20', fontWeight: 700 }}>{kgUsadoOf.toFixed(1)} kg usado</span>}
+                            {kgKardexOf > 0 && <span>{kgUsadoOf > 0 ? ' / ' : ''}{kgKardexOf.toFixed(1)} entregado</span>}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span style={{ fontSize: '14px', color: '#888', flexShrink: 0 }}>{abierto ? '▲' : '▼'}</span>
                   </div>
 
-                  {/* Turnos dentro de la OF */}
-                  {abierto && Object.values(ofGroup.turnos).map((turnoGrupo, tIdx) => {
-                    const kgKardexTurno = kardexMap[`${ofGroup.maquina}|${ofGroup.numeroOF || ''}|${turnoGrupo.fecha}|${turnoGrupo.turno}`] ?? null
-                    const analisis = calcularSemaforoTurno(turnoGrupo.items, productos, kgKardexTurno)
-
-                    return (
-                      <div key={turnoGrupo.turno} style={{ borderTop: tIdx > 0 ? '2px solid #e0e4ea' : '1px solid #e0e4ea' }}>
-                        {/* Sub-cabecera Turno */}
-                        <div style={{ backgroundColor: '#f8f9fa', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '13px', color: '#004895' }}>
-                              Turno {turnoGrupo.turno === 'M' ? 'Mañana' : turnoGrupo.turno === 'T' ? 'Tarde' : 'Noche'}
-                            </span>
-                            <span style={{ fontSize: '11px', color: '#888' }}>
-                              {turnoGrupo.fecha ? format(new Date(turnoGrupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '11px', color: '#888' }}>
-                            {turnoGrupo.items.length} registro{turnoGrupo.items.length > 1 ? 's' : ''}
-                          </span>
+                  {/* Máquinas → Turnos → Productos */}
+                  {abierto && maquinasArr.map((maqGroup, mIdx) => (
+                    <div key={maqGroup.maquina}>
+                      {/* Sub-cabecera de máquina (solo si hay más de una) */}
+                      {maquinasArr.length > 1 && (
+                        <div style={{ backgroundColor: '#e8f0fb', padding: '6px 16px', borderTop: mIdx > 0 ? '3px solid #c5d8f7' : '1px solid #e0e4ea' }}>
+                          <strong style={{ fontSize: '12px', color: '#004895' }}>{maqGroup.maquina}</strong>
                         </div>
+                      )}
 
-                        {/* Productos del turno */}
-                        {turnoGrupo.items.map((reg, idx) => {
-                          const estadoReg = reg.Estado_Validacion || null
-                          return (
-                            <div key={reg.ID} style={{
-                              padding: '10px 16px',
-                              borderTop: '1px solid #f0f0f0',
-                              display: 'grid', gridTemplateColumns: '12px 1fr auto',
-                              gap: '10px', alignItems: 'center',
-                            }}>
-                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLORES_SEMAFORO[estadoReg] || '#ccc', flexShrink: 0 }} title={estadoReg || 'Sin validar'} />
-                              <div>
-                                <p style={{ fontSize: '13px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
-                                  {nombresProductos[reg.Producto] || reg.Producto || '—'}
-                                  {reg.Estado === 'abierto' && <span style={{ backgroundColor: '#e3f2fd', color: '#1565c0', borderRadius: '6px', padding: '1px 7px', fontSize: '10px', marginLeft: '6px' }}>ABIERTO</span>}
-                                </p>
-                                {reg.Color && (
-                                  <p style={{ fontSize: '12px', color: '#555', margin: 0, marginTop: '2px' }}>
-                                    🎨 {reg.Color}
-                                  </p>
-                                )}
-                                <p style={{ fontSize: '11px', color: '#888', margin: 0, marginTop: '2px' }}>
-                                  👤 {reg.Operario || '—'} &nbsp;·&nbsp; ✓ {reg.UnidadesConformes ?? '—'} &nbsp;✗ {reg.UnidadesDefectuosas ?? '—'}
-                                </p>
+                      {Object.values(maqGroup.turnos).map((turnoGrupo, tIdx) => {
+                        const kgKardexTurno = kardexMap[`${maqGroup.maquina}|${ofGroup.numeroOF || ''}|${turnoGrupo.fecha}|${turnoGrupo.turno}`] ?? null
+                        const analisis = calcularSemaforoTurno(turnoGrupo.items, productos, kgKardexTurno)
+
+                        return (
+                          <div key={turnoGrupo.turno} style={{ borderTop: (tIdx > 0 || maquinasArr.length > 1) ? '2px solid #e0e4ea' : '1px solid #e0e4ea' }}>
+                            {/* Sub-cabecera Turno */}
+                            <div style={{ backgroundColor: '#f8f9fa', padding: '8px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '13px', color: '#004895' }}>
+                                  Turno {turnoGrupo.turno === 'M' ? 'Mañana' : turnoGrupo.turno === 'T' ? 'Tarde' : 'Noche'}
+                                </span>
+                                <span style={{ fontSize: '11px', color: '#888' }}>
+                                  {turnoGrupo.fecha ? format(new Date(turnoGrupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                                </span>
                               </div>
-                              <button onClick={() => setModalReg(reg)} style={{
-                                backgroundColor: '#004895', color: 'white', border: 'none',
-                                borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
-                                fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                              }}>Validar</button>
+                              <span style={{ fontSize: '11px', color: '#888' }}>
+                                {turnoGrupo.items.length} registro{turnoGrupo.items.length > 1 ? 's' : ''}
+                              </span>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
+
+                            {/* Productos del turno */}
+                            {turnoGrupo.items.map((reg) => {
+                              const estadoReg = reg.Estado_Validacion || null
+                              return (
+                                <div key={reg.ID} style={{
+                                  padding: '10px 16px',
+                                  borderTop: '1px solid #f0f0f0',
+                                  display: 'grid', gridTemplateColumns: '12px 1fr auto',
+                                  gap: '10px', alignItems: 'center',
+                                }}>
+                                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLORES_SEMAFORO[estadoReg] || '#ccc', flexShrink: 0 }} title={estadoReg || 'Sin validar'} />
+                                  <div>
+                                    <p style={{ fontSize: '13px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
+                                      {nombresProductos[reg.Producto] || reg.Producto || '—'}
+                                      {reg.Estado === 'abierto' && <span style={{ backgroundColor: '#e3f2fd', color: '#1565c0', borderRadius: '6px', padding: '1px 7px', fontSize: '10px', marginLeft: '6px' }}>ABIERTO</span>}
+                                    </p>
+                                    {reg.Color && (
+                                      <p style={{ fontSize: '12px', color: '#555', margin: 0, marginTop: '2px' }}>
+                                        🎨 {reg.Color}
+                                      </p>
+                                    )}
+                                    <p style={{ fontSize: '11px', color: '#888', margin: 0, marginTop: '2px' }}>
+                                      👤 {reg.Operario || '—'} &nbsp;·&nbsp; ✓ {reg.UnidadesConformes ?? '—'} &nbsp;✗ {reg.UnidadesDefectuosas ?? '—'}
+                                    </p>
+                                  </div>
+                                  <button onClick={() => setModalReg(reg)} style={{
+                                    backgroundColor: '#004895', color: 'white', border: 'none',
+                                    borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
+                                    fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                                  }}>Validar</button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
                 </div>
               )
             })}
