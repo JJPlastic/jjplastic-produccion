@@ -14,7 +14,7 @@ const TURNO_LABEL = { M: 'Mañana', T: 'Tarde', N: 'Noche' }
 
 export default function BienvenidaOperario() {
   const { getToken, usuario, logout } = useMsal()
-  const { setTurnoActivo, setPantalla, pendingCount, seleccionarRol, setModoRelevo, setOfPreseleccionada, setProductoPreseleccionado } = useApp()
+  const { turnoActivo, setTurnoActivo, setPantalla, pendingCount, seleccionarRol, setModoRelevo, setOfPreseleccionada, setProductoPreseleccionado } = useApp()
   const { productos: catalogoProductos } = useMaestros(getToken)
 
   const resolverNombre = (codigo) => {
@@ -45,9 +45,16 @@ export default function BienvenidaOperario() {
 
         if (regs.status === 'fulfilled') {
           const deMiMaquina = regs.value.filter(r => (r.Title || '') === tabletConfig.codigoMaquina)
-          setRegistrosActivos(deMiMaquina.filter(r =>
-            r.Estado === 'abierto' || r.Estado === 'transferido'
-          ))
+          const activosSP = deMiMaquina.filter(r => r.Estado === 'abierto' || r.Estado === 'transferido')
+
+          // Auto-restaurar si SP tiene turno abierto pero IndexedDB lo perdió (cierre de sesión, etc.)
+          if (activosSP.length > 0 && !turnoActivo) {
+            const reg = activosSP[0]
+            await setTurnoActivo({ ...reg, Paradas: reg.Paradas || '[]', spId: reg.ID })
+            return // setTurnoActivo navega a turno-activo automáticamente
+          }
+
+          setRegistrosActivos(activosSP)
           const hoy = new Date().toISOString().split('T')[0]
           const cerradosHoy = deMiMaquina.filter(r =>
             r.Estado === 'cerrado' &&
