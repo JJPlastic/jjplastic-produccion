@@ -15,10 +15,11 @@ const TURNO_LABEL = { M: 'Mañana', T: 'Tarde', N: 'Noche' }
 export default function BienvenidaOperario() {
   const { getToken, usuario, logout } = useMsal()
   const { turnoActivo, setTurnoActivo, setPantalla, pendingCount, seleccionarRol, setModoRelevo, setOfPreseleccionada, setProductoPreseleccionado } = useApp()
-  const { productos: catalogoProductos } = useMaestros(getToken)
+  const { productos: catalogoProductos, materiasPrimas: catalogoMP } = useMaestros(getToken)
 
   const resolverNombre = (codigo) => {
-    const p = catalogoProductos.find(x => (x.Codigo || '') === codigo || (x.Nombre || x.Title || '') === codigo)
+    const catalogo = [...catalogoProductos, ...catalogoMP]
+    const p = catalogo.find(x => (x.Codigo || '') === codigo || (x.Nombre || x.Title || '') === codigo)
     return p ? (p.Nombre || p.Title || codigo) : codigo
   }
 
