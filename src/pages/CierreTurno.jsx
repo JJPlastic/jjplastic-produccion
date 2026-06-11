@@ -180,6 +180,8 @@ export default function CierreTurno() {
   }, [feedback])
 
   const requiereRespuestaTransf = kardexOF.length > 0 && transferenciaPendiente === null
+  // Bloquear campos MP hasta que el operario responda la pregunta de balance
+  const mpDisabled = kardexOF.length > 0 && transferenciaPendiente === null
   const canSubmit = isValid && veracidad && !enviando && (!fotoRequerida || fotoEvidencia) && !requiereRespuestaTransf && mpSaldosOk
 
   const onSubmit = async (data) => {
@@ -476,7 +478,7 @@ export default function CierreTurno() {
                       color: transferenciaPendiente === false ? 'white' : '#333',
                       fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                     }}>
-                      ✓ No — cierre final
+                      ✓ No — cierre color/turno
                     </button>
                     <button type="button" onClick={() => setTransferenciaPendiente(true)} style={{
                       flex: 1, padding: '10px 8px', borderRadius: '8px', border: '2px solid',
@@ -583,7 +585,18 @@ export default function CierreTurno() {
 
                     {/* Campos de balance — Base siempre visible, Colorante solo si expandido */}
                     {(tipo === 'Base' || colorantesExpand[k.ID]) && (
-                    <div style={{ backgroundColor: 'white', padding: '12px' }}>
+                    <div style={{ backgroundColor: 'white', padding: '12px', position: 'relative' }}>
+                      {mpDisabled && (
+                        <div style={{
+                          position: 'absolute', inset: 0, zIndex: 2, borderRadius: '0 0 8px 8px',
+                          backgroundColor: 'rgba(245,245,245,0.82)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <span style={{ fontSize: '12px', color: '#888', fontWeight: 600 }}>
+                            ⬆ Responde la pregunta de arriba
+                          </span>
+                        </div>
+                      )}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {[
                         ['KgUsado',      'Kg usado en prod.'],
@@ -604,7 +617,8 @@ export default function CierreTurno() {
                             value={e[campo] ?? ''}
                             onChange={ev => updateMpEdit(k.ID, campo, ev.target.value)}
                             placeholder="0"
-                            style={{ ...smallInput, borderColor: campoError ? '#d32f2f' : '#ddd' }}
+                            disabled={mpDisabled}
+                            style={{ ...smallInput, borderColor: campoError ? '#d32f2f' : '#ddd', opacity: mpDisabled ? 0.5 : 1 }}
                           />
                           {campoError && <p style={{ color: '#d32f2f', fontSize: '10px', margin: '2px 0 0' }}>Obligatorio</p>}
                         </div>
