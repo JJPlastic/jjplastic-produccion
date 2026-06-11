@@ -10,6 +10,7 @@ import { LoadingSpinner, FullscreenFeedback } from '../components/LoadingSpinner
 import { SearchSelect } from '../components/SearchSelect'
 import { createListItem, updateListItem, getListItems, getOFsActivas } from '../services/sharepoint'
 import { encolarOperacion } from '../services/indexedDB'
+import { Toast } from '../components/Toast'
 import { tabletConfig } from '../config/tabletConfig'
 
 const TURNOS = [
@@ -66,6 +67,7 @@ export default function InicioTurno() {
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm()
   const [enviando, setEnviando]             = useState(false)
   const [feedback, setFeedback]             = useState(null)
+  const [toast, setToast]                   = useState(null)
   const [intentoEnviar, setIntentoEnviar]   = useState(false)
   const [ofsActivas, setOfsActivas]         = useState([])
   const [ofSeleccionada, setOfSeleccionada] = useState(null)
@@ -233,7 +235,7 @@ export default function InicioTurno() {
         const duplicado = existentes.some(r => (r.Fecha || r.HoraInicio || '').startsWith(hoy))
         if (duplicado) {
           setEnviando(false)
-          alert(`⚠ Ya existe un registro abierto para ${tabletConfig.nombreMaquina} en el turno ${registroLocal.Turno} de hoy. Ciérralo antes de abrir uno nuevo.`)
+          setToast({ mensaje: `Ya existe un turno abierto para ${tabletConfig.nombreMaquina} en el turno ${registroLocal.Turno} de hoy. Ciérralo antes de abrir uno nuevo.`, tipo: 'warn' })
           return
         }
 
@@ -358,6 +360,7 @@ export default function InicioTurno() {
 
   return (
     <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <Header
         titulo="Inicio de turno"
         subtitulo={format(new Date(), "EEEE d 'de' MMMM", { locale: es })}

@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { SearchSelect } from '../../components/SearchSelect'
 import { useMsal } from '../../hooks/useMsal'
 import { getListItems, createListItem, updateListItem, getOFsActivas } from '../../services/sharepoint'
+import { Toast, mensajeRed } from '../../components/Toast'
 
 const TURNOS = [{ id: 'M', label: 'Mañana' }, { id: 'T', label: 'Tarde' }, { id: 'N', label: 'Noche' }]
 
@@ -65,6 +66,8 @@ export default function KardexMP({ onVolver, onLogout }) {
   const [cargando, setCargando]             = useState(true)
   const [enviando, setEnviando]             = useState(false)
   const [feedback, setFeedback]             = useState(null)
+  const [toast, setToast]                   = useState(null)
+  const toastError = (err) => setToast({ mensaje: mensajeRed(err), tipo: 'error' })
   // Historial: filtro y grupos
   const [filtroFechaHist, setFiltroFechaHist] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [filtroTurnoHist, setFiltroTurnoHist] = useState('todos')
@@ -224,7 +227,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       setFilasAdicionales([filaVacia()])
       cargar()
     } catch (err) {
-      alert('Error: ' + err.message)
+      toastError(err)
     } finally {
       setGuardandoAd(false)
     }
@@ -239,7 +242,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       setEntradas(prev => prev.map(e => e.ID === id ? { ...e, KgEntregados: kg } : e))
       setEditEntradaId(null)
     } catch (err) {
-      alert('Error al guardar: ' + err.message)
+      toastError(err)
     } finally {
       setGuardandoEntrada(false)
     }
@@ -286,7 +289,7 @@ export default function KardexMP({ onVolver, onLogout }) {
         : e
       ))
     } catch (err) {
-      alert('Error al validar: ' + err.message)
+      toastError(err)
     }
   }
 
@@ -303,7 +306,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       setEditDevId(null)
       setEditDevKg('')
     } catch (err) {
-      alert('Error al guardar devolución: ' + err.message)
+      toastError(err)
     } finally {
       setGuardandoDev(false)
     }
@@ -327,7 +330,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       setMaqDestinoSel('')
       cargar()
     } catch (err) {
-      alert('Error al reasignar: ' + err.message)
+      toastError(err)
     } finally {
       setGuardandoReasig(false)
     }
@@ -358,7 +361,7 @@ export default function KardexMP({ onVolver, onLogout }) {
 
       const insumosATransferir = Object.values(porInsumo).filter(i => i.disponible > 0.001)
       if (!insumosATransferir.length) {
-        alert('No hay kg disponibles para transferir en este grupo.')
+        setToast({ mensaje: 'No hay kg disponibles para transferir en este grupo.', tipo: 'warn' })
         setGuardandoTransf(false)
         return
       }
@@ -406,7 +409,7 @@ export default function KardexMP({ onVolver, onLogout }) {
       setMaqDestinoSel('')
       cargar()
     } catch (err) {
-      alert('Error al transferir: ' + err.message)
+      toastError(err)
     } finally {
       setGuardandoTransf(false)
     }
@@ -475,6 +478,7 @@ export default function KardexMP({ onVolver, onLogout }) {
 
   return (
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       {/* Header */}
       <header style={{ backgroundColor: '#37BEEC', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
         <div>

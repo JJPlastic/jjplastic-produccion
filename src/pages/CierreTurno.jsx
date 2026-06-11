@@ -7,6 +7,7 @@ import { updateListItem, getListItems, uploadAttachment } from '../services/shar
 import { encolarOperacion } from '../services/indexedDB'
 import { useProduccionParcial } from '../hooks/useProduccionParcial'
 import { useMaestros } from '../hooks/useMaestros'
+import { Toast } from '../components/Toast'
 
 const inputStyle = {
   width: '100%', padding: '14px 12px', borderRadius: '10px',
@@ -49,6 +50,7 @@ export default function CierreTurno() {
   const { register, handleSubmit, formState: { errors, isValid }, watch, setValue } = useForm({ mode: 'onChange' })
   const [enviando, setEnviando]       = useState(false)
   const [feedback, setFeedback]       = useState(null)
+  const [toast, setToast]             = useState(null)
   const [fotoEvidencia, setFotoEvidencia] = useState(null)
   const fotoRef = useRef(null)
   // null = no respondido | false = cierre final | true = continúa en otra máquina
@@ -183,7 +185,7 @@ export default function CierreTurno() {
   const onSubmit = async (data) => {
     setIntentoEnviar(true)
     if (fotoRequerida && !fotoEvidencia) {
-      alert(`⚠ La foto es obligatoria cuando las defectuosas superan el 5% (${pctDefWatch.toFixed(1)}%).`)
+      setToast({ mensaje: `La foto es obligatoria cuando las defectuosas superan el 5% (${pctDefWatch.toFixed(1)}%).`, tipo: 'warn' })
       return
     }
     if (kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk || !mpSaldosOk)) return
@@ -361,6 +363,7 @@ export default function CierreTurno() {
 
   return (
     <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <Header
         titulo="Registro de producción"
         subtitulo={`${turnoActivo?.Operario} · ${resolverNombre(turnoActivo?.Producto)}${turnoActivo?.Color ? ' · ' + turnoActivo.Color : ''}`}

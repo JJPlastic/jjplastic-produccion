@@ -3,6 +3,7 @@ import { format, parseISO, differenceInHours } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useMsal } from '../../hooks/useMsal'
 import { getListItems, updateListItem, resolveUserId } from '../../services/sharepoint'
+import { Toast, mensajeRed } from '../../components/Toast'
 
 // ─── Clave de turno para agrupar registros del mismo turno ────────────────────
 // eslint-disable-next-line react-refresh/only-export-components
@@ -107,6 +108,7 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
   const [motivo, setMotivo] = useState(registro.Motivo_Correccion || '')
   const [editando, setEditando] = useState(true)
   const [autorizadoPorJefe, setAutorizadoPorJefe] = useState(false)
+  const [errorModal, setErrorModal] = useState('')
 
   // Solo MP_KgUsado (real Base MP) editable en Registro_Produccion
   // Merma, devueltos → solo en Kardex_MP
@@ -469,12 +471,20 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
 
         {/* ── Footer sticky ── */}
         <div style={{ padding: '12px 16px', borderTop: '1px solid #e0e0e0', backgroundColor: 'white', flexShrink: 0 }}>
+          {errorModal && (
+            <div style={{ backgroundColor: '#ffebee', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', color: '#c62828', fontWeight: 600, marginBottom: '8px' }}>
+              ⚠ {errorModal}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
             <button onClick={onCerrar} style={{
               padding: '13px', borderRadius: '10px', border: '2px solid #ddd',
               backgroundColor: 'white', color: '#555', fontSize: '14px', cursor: 'pointer',
             }}>Cancelar</button>
-            <button onClick={() => onGuardar({ estado, obs, motivo, editando, edits, autorizadoPorJefe, kardexEdits, mpLineaEdits })} disabled={guardando} style={{
+            <button onClick={() => {
+              setErrorModal('')
+              onGuardar({ estado, obs, motivo, editando, edits, autorizadoPorJefe, kardexEdits, mpLineaEdits, setErrorModal })
+            }} disabled={guardando} style={{
               padding: '13px', borderRadius: '10px', border: 'none',
               backgroundColor: guardando ? '#ccc' : COLORES_SEMAFORO[estado] || '#004895',
               color: 'white', fontSize: '15px', fontWeight: 700,
@@ -574,28 +584,31 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
     return matchFecha && matchEstado
   })
 
-  const handleGuardar = async ({ estado, obs, motivo, editando, edits, autorizadoPorJefe, kardexEdits, mpLineaEdits }) => {
-    // Detectar si realmente hubo cambios en los datos
+  const [toast, setToast] = useState(null)
+
+  const handleGuardar = async ({ estado, obs, motivo, editando, edits, autorizadoPorJefe, kardexEdits, mpLineaEdits, setErrorModal }) => {
     const huboCambios = editando && Object.entries(edits).some(([k, v]) =>
       v !== '' && Number(v) !== (modalReg?.[k] ?? 0)
     )
 
     if (huboCambios && !motivo.trim()) {
-      alert('El motivo de corrección es obligatorio cuando se editan datos.')
+      setErrorModal?.('El motivo de corrección es obligatorio cuando se editan datos.')
       return
     }
 
-    // Gap 3: Corrección retroactiva requiere autorización del Jefe
     if (huboCambios) {
       const fechaReg = modalReg.Fecha ? modalReg.Fecha.split('T')[0] : ''
       const hoy = new Date().toISOString().split('T')[0]
       if (fechaReg && fechaReg < hoy && !autorizadoPorJefe) {
-        alert('Este registro es de un día anterior. Obtén autorización del Jefe de Operaciones antes de corregir.')
+        setErrorModal?.('Este registro es de un día anterior. Obtén autorización del Jefe de Operaciones antes de corregir.')
         return
       }
     }
 
-    if (!navigator.onLine) { alert('Sin conexión a internet. Intenta nuevamente cuando recuperes la conexión.'); return }
+    if (!navigator.onLine) {
+      setErrorModal?.('Sin conexión a internet. Intenta nuevamente cuando recuperes la red.')
+      return
+    }
     setGuardando(true)
     try {
       const token = await getToken()
@@ -719,7 +732,8 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
 
       setModalReg(null)
     } catch (err) {
-      alert('Error al guardar: ' + err.message)
+      setErrorModal?.(mensajeRed(err))
+      setToast({ mensaje: mensajeRed(err), tipo: 'error' })
     } finally {
       setGuardando(false)
     }
@@ -771,6 +785,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
 
   return (
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       {/* Header PCP */}
       <header style={{ backgroundColor: '#37BEEC', color: 'white', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
         <div>

@@ -11,6 +11,7 @@ import { encolarOperacion } from '../services/indexedDB'
 import { useMaestros } from '../hooks/useMaestros'
 import { SearchSelect } from '../components/SearchSelect'
 import { useProduccionParcial } from '../hooks/useProduccionParcial'
+import { Toast, mensajeRed } from '../components/Toast'
 
 // Formatea segundos → HH:MM:SS
 const formatCronometro = (secs) => {
@@ -69,6 +70,7 @@ export default function TurnoActivo() {
   const [modalMP, setModalMP]             = useState(false)
   const [mpFilas, setMpFilas]             = useState([{ id: crypto.randomUUID(), insumo: '', kg: '' }])
   const [guardandoMP, setGuardandoMP]     = useState(false)
+  const [toast, setToast]                 = useState(null)
 
   const { materiasPrimas, productos: catalogoProductos } = useMaestros(getToken)
   const [parcConf, setParcConf]         = useState('')
@@ -175,9 +177,9 @@ export default function TurnoActivo() {
           await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, { TieneFoto: true })
         }
       }
-      alert('Foto adjuntada correctamente.')
+      setToast({ mensaje: '✓ Foto adjuntada correctamente.', tipo: 'ok' })
     } catch (err) {
-      alert('Error al subir foto: ' + err.message)
+      setToast({ mensaje: mensajeRed(err), tipo: 'error' })
     } finally {
       setSubiendo(false)
       e.target.value = ''
@@ -238,8 +240,9 @@ export default function TurnoActivo() {
       }
       setModalMP(false)
       setMpFilas([{ id: crypto.randomUUID(), insumo: '', kg: '' }])
+      setToast({ mensaje: '✓ MP guardada en Kardex.', tipo: 'ok' })
     } catch (err) {
-      alert('Error: ' + err.message)
+      setToast({ mensaje: mensajeRed(err), tipo: 'error' })
     } finally {
       setGuardandoMP(false)
     }
@@ -260,7 +263,7 @@ export default function TurnoActivo() {
       setModalParcial(false)
       setParcConf(''); setParcDef(''); setParcObs('')
     } catch (err) {
-      alert('Error: ' + err.message)
+      setToast({ mensaje: mensajeRed(err), tipo: 'error' })
     } finally {
       setGuardandoParcial(false)
     }
@@ -537,6 +540,8 @@ export default function TurnoActivo() {
         )}
       </div>
     </div>
+
+    <Toast toast={toast} onClose={() => setToast(null)} />
 
     {/* Overlay alerta 2h sin reporte */}
     {minutosSinReporte >= 120 && (
