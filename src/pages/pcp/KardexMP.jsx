@@ -534,7 +534,7 @@ export default function KardexMP({ onVolver, onLogout }) {
               </div>
               <div>
                 <label style={lbl}>Máquina *</label>
-                <select value={maquina} onChange={e => setMaquina(e.target.value)} style={{ ...sel, borderColor: maquina ? '#004895' : '#ddd', borderWidth: '2px' }}>
+                <select value={maquina} onChange={e => { setMaquina(e.target.value); setCodigoLote('') }} style={{ ...sel, borderColor: maquina ? '#004895' : '#ddd', borderWidth: '2px' }}>
                   <option value="">Seleccionar máquina...</option>
                   {maquinas.map(m => {
                     const nombre = m.Nombre || m.Title || '(sin nombre)'
@@ -607,7 +607,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                         <label style={{ ...lbl, fontSize: '12px' }}>Producto a producir *</label>
                         <SearchSelect
                           opciones={productosPA.map(p => ({
-                            value: p.Nombre || p.Title || '',
+                            value: p.Codigo || p.Nombre || p.Title || '',
                             label: (p.Nombre || p.Title || '') + (p.Codigo ? ` (${p.Codigo})` : ''),
                           }))}
                           value={grupo.producto}
@@ -626,7 +626,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                           }}>
                             <SearchSelect
                               opciones={materiasPrimas.map(mp => ({
-                                value: mp.Nombre || mp.Title || '',
+                                value: mp.Codigo || mp.Nombre || mp.Title || '',
                                 label: (mp.Nombre || mp.Title || '') + (mp.Codigo ? ` (${mp.Codigo})` : ''),
                               }))}
                               value={fila.mp}
