@@ -24,15 +24,25 @@ const smallInput = {
 export default function CierreTurno() {
   const { getToken, logout } = useMsal()
   const { turnoActivo, limpiarTurno, pendingCount, setPantalla, actualizarTurnoLocal } = useApp()
-  const { materiasPrimas } = useMaestros(getToken)
+  const { productos: catalogoPT, materiasPrimas } = useMaestros(getToken)
 
-  // Determina si un insumo es Base o Colorante según Maestro_Productos.TipoProducto
-  // MP = Base (plástico estructural) | MC = Colorante/pigmento
-  const getTipoInsumo = (nombreInsumo) => {
-    const mp = materiasPrimas.find(p =>
-      (p.Nombre || p.Title || '').toLowerCase() === (nombreInsumo || '').toLowerCase()
+  // Resolver código o nombre → nombre para display
+  const resolverNombre = (valor) => {
+    const catalogo = [...catalogoPT, ...materiasPrimas]
+    const item = catalogo.find(p =>
+      (p.Codigo || '') === valor ||
+      (p.Nombre || p.Title || '').toLowerCase() === (valor || '').toLowerCase()
     )
-    if (!mp) return 'Base'  // fallback: tratar como Base si no se encuentra
+    return item ? (item.Nombre || item.Title || valor) : valor
+  }
+
+  // Determina si un insumo es Base o Colorante — busca por código O nombre
+  const getTipoInsumo = (insumoVal) => {
+    const mp = materiasPrimas.find(p =>
+      (p.Codigo || '') === insumoVal ||
+      (p.Nombre || p.Title || '').toLowerCase() === (insumoVal || '').toLowerCase()
+    )
+    if (!mp) return 'Base'
     const tipo = (mp.TipoProducto || '').toUpperCase()
     return tipo === 'MC' ? 'Colorante' : 'Base'
   }
@@ -330,7 +340,7 @@ export default function CierreTurno() {
     <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
       <Header
         titulo="Registro de producción"
-        subtitulo={`${turnoActivo?.Operario} · ${turnoActivo?.Producto}${turnoActivo?.Color ? ' · ' + turnoActivo.Color : ''}`}
+        subtitulo={`${turnoActivo?.Operario} · ${resolverNombre(turnoActivo?.Producto)}${turnoActivo?.Color ? ' · ' + turnoActivo.Color : ''}`}
         pendingCount={pendingCount}
         onLogout={logout}
         color="#004895"
@@ -520,7 +530,7 @@ export default function CierreTurno() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '14px' }}>
                           {tipo !== 'Base' && <span style={{ marginRight: '6px', fontSize: '12px' }}>{colorantesExpand[k.ID] ? '▼' : '▶'}</span>}
-                          {k.Insumo}
+                          {resolverNombre(k.Insumo)}
                         </div>
                         <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <span>PCP: {k.KgEntregados} kg</span>
