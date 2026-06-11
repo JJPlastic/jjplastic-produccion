@@ -51,7 +51,8 @@ export const useMaestros = (getToken) => {
             item.Activo === true || item.Activo === 1 || item.Activo === undefined
 
           const logFallo = (nombre, reason) => {
-            if (reason?.name === 'AbortError') return // cancelación silenciosa (StrictMode / nav)
+            if (reason?.name === 'AbortError') return
+            if (reason?.name === 'TypeError') return // Failed to fetch / offline — caché activo
             console.warn(`${nombre} no disponible — usando caché:`, reason?.message || reason)
           }
 
@@ -64,7 +65,7 @@ export const useMaestros = (getToken) => {
           if (rProds.status === 'fulfilled') {
             const todos = rProds.value
             const pt = todos.filter(p => esActivo(p) && (p.TipoProducto || '').toUpperCase() === 'PT')
-            const mp = todos.filter(p => ['MP','MC'].includes((p.TipoProducto || '').toUpperCase()))
+            const mp = todos.filter(p => esActivo(p) && ['MP','MC'].includes((p.TipoProducto || '').toUpperCase()))
             setProductos(pt)
             setMPRaw(mp)
             await guardarMaestro('productos', pt)

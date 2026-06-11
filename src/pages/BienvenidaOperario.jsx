@@ -28,7 +28,8 @@ export default function BienvenidaOperario() {
   const [registrosCerrados, setRegistrosCerrados] = useState([])
   const [ofsKardex, setOfsKardex]             = useState([])
   const [cargandoReg, setCargandoReg]         = useState(null)
-  const [pendingProductos, setPendingProductos] = useState([]) // productos pendientes de la última OF
+  const [pendingProductos, setPendingProductos] = useState([])
+  const [kardexUltimaOF, setKardexUltimaOF]   = useState([]) // kardex items del último cierre
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +76,7 @@ export default function BienvenidaOperario() {
                 const kardexOf = await getListItems(token, 'Kardex_MP', {
                   filter: `Numero_OF eq '${ofMasReciente}'`, top: 100,
                 })
+                setKardexUltimaOF(kardexOf)
                 const prodsOf = [...new Set(kardexOf.filter(k => k.Producto).map(k => k.Producto))]
                 const completadosOF = new Set(deEsaOF.map(r => r.Producto))
                 const activosOF = new Set(
@@ -147,6 +149,13 @@ export default function BienvenidaOperario() {
   const fechaHoy = format(new Date(), "EEEE d 'de' MMMM", { locale: es })
   const ultimoReg = registrosCerrados[0] || null
   const primerNombre = usuario?.nombre?.split(' ')[0] || ''
+
+  // Hay saldo si algún item del Kardex de la última OF todavía tiene kg disponibles
+  const haySaldoMP = kardexUltimaOF.length > 0 && kardexUltimaOF.some(k => {
+    const kg = (k.KgEntregados > 0) ? k.KgEntregados : (k.KgDeclaradoOperario || 0)
+    const saldo = kg - (k.KgUsado || 0) - (k.KgMermaRec || 0) - (k.KgMermaNoRec || 0) - (k.KgDevueltos || 0)
+    return saldo > 0.01
+  })
 
   return (
     <div style={{
@@ -296,7 +305,7 @@ export default function BienvenidaOperario() {
               </div>
             </div>
             <div style={{ padding: '4px 12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {/* Continuar mismo producto — siempre disponible */}
+              {/* Continuar mismo producto — solo si hay saldo de MP/MC en Kardex */}
               <button
                 onClick={async () => {
                   setCargandoReg('relevo')
@@ -305,18 +314,26 @@ export default function BienvenidaOperario() {
                   setPantalla('cambio-producto')
                   setCargandoReg(null)
                 }}
-                disabled={!!cargandoReg}
+                disabled={!!cargandoReg || !haySaldoMP}
+                title={!haySaldoMP ? 'Sin saldo de MP disponible en Kardex para esta OF' : ''}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(135deg, #37BEEC, #0288d1)',
+                  background: haySaldoMP
+                    ? 'linear-gradient(135deg, #37BEEC, #0288d1)'
+                    : '#bdbdbd',
                   color: 'white', border: 'none', borderRadius: '10px',
                   padding: '14px', fontSize: '14px', fontWeight: 700,
-                  minHeight: '50px', cursor: 'pointer',
-                  boxShadow: '0 3px 10px rgba(55,190,236,0.35)',
+                  minHeight: '50px', cursor: haySaldoMP ? 'pointer' : 'not-allowed',
+                  opacity: haySaldoMP ? 1 : 0.65,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 }}>
                 {cargandoReg === 'relevo' ? '⏳' : '🔄'} Continuar mismo producto
               </button>
+              {!haySaldoMP && kardexUltimaOF.length > 0 && (
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0', textAlign: 'center' }}>
+                  Sin saldo de MP disponible en Kardex
+                </p>
+              )}
 
               {/* Productos pendientes de la OF */}
               {pendingProductos.length > 0 ? (
@@ -349,7 +366,8 @@ export default function BienvenidaOperario() {
                     </button>
                   ))}
                 </>
-              ) : (
+              ) : !ultimoReg?.Numero_OF ? (
+                /* "Otro producto" — solo si el turno anterior fue sin OF de PCP */
                 <button
                   onClick={async () => {
                     setCargandoReg('cambio')
@@ -370,7 +388,7 @@ export default function BienvenidaOperario() {
                   }}>
                   {cargandoReg === 'cambio' ? '⏳' : '📦'} Otro producto
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         ) : null}

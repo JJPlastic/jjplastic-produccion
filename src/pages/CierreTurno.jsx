@@ -141,6 +141,29 @@ export default function CierreTurno() {
   const mpBaseOk = mpBaseKardex.length === 0 || mpBaseKardex.every(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
   const mpColorantesOk = mpColorantesKardex.length === 0 || mpColorantesKardex.some(k => numEdit(mpEdits[k.ID], 'KgUsado') > 0)
 
+  // Ningún insumo puede tener saldo negativo — la suma de consumos no puede superar lo entregado
+  const mpSaldosOk = kardexOF.length === 0 || (() => {
+    const grupos = {}
+    kardexOF.forEach(k => {
+      const key = (k.Insumo || '').trim().toLowerCase()
+      if (!grupos[key]) grupos[key] = []
+      grupos[key].push(k)
+    })
+    return Object.values(grupos).every(grupo => {
+      const k = grupo[0]
+      const kgBase = grupo.reduce((s, entry) => s + (entry.KgDeclaradoOperario ?? entry.KgEntregados ?? 0), 0)
+      const kgKardexAcum = grupo.reduce((s, entry) =>
+        s + (entry.KgUsado || 0) + (entry.KgMermaRec || 0) + (entry.KgMermaNoRec || 0) + (entry.KgDevueltos || 0), 0)
+      const esBase = getTipoInsumo(k.Insumo) === 'Base'
+      const kgYaReg = kgKardexAcum > 0 ? kgKardexAcum : (esBase && mpYaUsadoOF > 0 ? mpYaUsadoOF : 0)
+      const e = mpEdits[k.ID] || {}
+      const balance = kgBase - kgYaReg
+        - numEdit(e, 'KgUsado') - numEdit(e, 'KgMermaRec')
+        - numEdit(e, 'KgMermaNoRec') - numEdit(e, 'KgDevueltos')
+      return balance >= -0.01
+    })
+  })()
+
   const kgPorUnidad  = turnoActivo?.KgPorUnidadProducto ?? 0
   // Teórico = unidades producidas × estándar
   const mpTeorica   = kgPorUnidad > 0 ? prodTotal * kgPorUnidad : 0
@@ -155,7 +178,7 @@ export default function CierreTurno() {
   }, [feedback])
 
   const requiereRespuestaTransf = kardexOF.length > 0 && transferenciaPendiente === null
-  const canSubmit = isValid && veracidad && !enviando && (!fotoRequerida || fotoEvidencia) && !requiereRespuestaTransf
+  const canSubmit = isValid && veracidad && !enviando && (!fotoRequerida || fotoEvidencia) && !requiereRespuestaTransf && mpSaldosOk
 
   const onSubmit = async (data) => {
     setIntentoEnviar(true)
@@ -163,7 +186,7 @@ export default function CierreTurno() {
       alert(`⚠ La foto es obligatoria cuando las defectuosas superan el 5% (${pctDefWatch.toFixed(1)}%).`)
       return
     }
-    if (kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk)) return
+    if (kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk || !mpSaldosOk)) return
     setEnviando(true)
     const ahora = new Date()
 
@@ -557,7 +580,8 @@ export default function CierreTurno() {
 
                     {/* Campos de balance — Base siempre visible, Colorante solo si expandido */}
                     {(tipo === 'Base' || colorantesExpand[k.ID]) && (
-                    <div style={{ backgroundColor: 'white', padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ backgroundColor: 'white', padding: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {[
                         ['KgUsado',      'Kg usado en prod.'],
                         ['KgMermaRec',   'Kg merma rec.'],
@@ -583,6 +607,12 @@ export default function CierreTurno() {
                         </div>
                         )
                       })}
+                      </div>
+                      {balance < -0.01 && (
+                        <div style={{ marginTop: '10px', backgroundColor: '#ffebee', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#c62828', fontWeight: 700 }}>
+                          ⚠ Excede el saldo disponible. Máximo: <strong>{(kgBase - kgYaReg).toFixed(2)} kg</strong> en total (usado + mermas + devueltos).
+                        </div>
+                      )}
                     </div>
                     )}
                   </div>
@@ -634,11 +664,12 @@ export default function CierreTurno() {
           </div>
 
           {/* Error MP visible antes del botón */}
-          {intentoEnviar && kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk) && (
+          {intentoEnviar && kardexOF.length > 0 && (!mpBaseOk || !mpColorantesOk || !mpSaldosOk) && (
             <div style={{ backgroundColor: '#ffebee', border: '2px solid #d32f2f', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: '#c62828', fontWeight: 600 }}>
               ⚠ Completa el balance de MP antes de confirmar:
               {!mpBaseOk && <div style={{ fontWeight: 400, marginTop: '4px' }}>• Ingresa los kg usados en cada MP Base</div>}
               {!mpColorantesOk && mpColorantesKardex.length > 0 && <div style={{ fontWeight: 400, marginTop: '4px' }}>• Ingresa los kg usados en al menos un colorante</div>}
+              {!mpSaldosOk && <div style={{ fontWeight: 400, marginTop: '4px' }}>• Uno o más insumos superan el saldo entregado por PCP</div>}
             </div>
           )}
 

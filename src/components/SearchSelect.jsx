@@ -1,11 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
-/**
- * Campo con búsqueda y sugerencias en tiempo real.
- * Reemplaza <select> para listas largas.
- */
 export const SearchSelect = ({
-  opciones = [],       // [{ value, label }]
+  opciones = [],
   value,
   onChange,
   placeholder = 'Buscar...',
@@ -15,6 +12,7 @@ export const SearchSelect = ({
   const [texto, setTexto]         = useState('')
   const [abierto, setAbierto]     = useState(false)
   const [resaltado, setResaltado] = useState(-1)
+  const [pos, setPos]             = useState({ top: 0, left: 0, width: 0 })
   const inputRef                  = useRef(null)
   const listaRef                  = useRef(null)
   const contenedorRef             = useRef(null)
@@ -24,6 +22,17 @@ export const SearchSelect = ({
   const filtradas = texto.trim()
     ? opciones.filter(o => o.label.toLowerCase().includes(texto.toLowerCase())).slice(0, 40)
     : opciones.slice(0, 40)
+
+  // Recalcular posición cada vez que se abre
+  useEffect(() => {
+    if (!abierto || !contenedorRef.current) return
+    const rect = contenedorRef.current.getBoundingClientRect()
+    setPos({
+      top:   rect.bottom + window.scrollY,
+      left:  rect.left   + window.scrollX,
+      width: rect.width,
+    })
+  }, [abierto])
 
   const seleccionar = (opcion) => {
     onChange(opcion.value)
@@ -53,7 +62,10 @@ export const SearchSelect = ({
   // Cerrar al clic afuera
   useEffect(() => {
     const fn = (e) => {
-      if (!contenedorRef.current?.contains(e.target)) {
+      if (
+        !contenedorRef.current?.contains(e.target) &&
+        !listaRef.current?.contains(e.target)
+      ) {
         setAbierto(false)
         setTexto('')
       }
@@ -68,6 +80,75 @@ export const SearchSelect = ({
       listaRef.current.children[resaltado]?.scrollIntoView({ block: 'nearest' })
     }
   }, [resaltado])
+
+  const dropdown = (abierto && filtradas.length > 0) ? createPortal(
+    <div ref={listaRef} style={{
+      position: 'absolute',
+      top:   pos.top,
+      left:  pos.left,
+      width: pos.width,
+      zIndex: 99999,
+      backgroundColor: 'white',
+      border: '2px solid #004895',
+      borderTop: 'none',
+      borderRadius: '0 0 10px 10px',
+      maxHeight: '240px', overflowY: 'auto',
+      boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
+    }}>
+      {filtradas.map((op, idx) => {
+        const lbl = op.label
+        const q = texto.toLowerCase()
+        const i = q ? lbl.toLowerCase().indexOf(q) : -1
+        return (
+          <div key={`${op.value}-${idx}`}
+            onMouseDown={(e) => { e.preventDefault(); seleccionar(op) }}
+            style={{
+              padding: '12px 14px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              color: '#1a1a1a',
+              backgroundColor:
+                idx === resaltado ? '#e8f0fe'
+                : op.value === value ? '#f0f4ff'
+                : 'white',
+              borderBottom: '1px solid #f0f0f0',
+              fontWeight: op.value === value ? 700 : 400,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+            <span>
+              {i >= 0 ? (
+                <>
+                  {lbl.slice(0, i)}
+                  <mark style={{ backgroundColor: '#fff176', borderRadius: '2px', padding: '0 1px', color: '#1a1a1a' }}>
+                    {lbl.slice(i, i + q.length)}
+                  </mark>
+                  {lbl.slice(i + q.length)}
+                </>
+              ) : lbl}
+            </span>
+            {op.value === value && <span style={{ color: '#004895', fontSize: '13px' }}>✓</span>}
+          </div>
+        )
+      })}
+    </div>,
+    document.body
+  ) : (abierto && texto.trim() && filtradas.length === 0) ? createPortal(
+    <div style={{
+      position: 'absolute',
+      top:   pos.top,
+      left:  pos.left,
+      width: pos.width,
+      zIndex: 99999,
+      backgroundColor: 'white',
+      border: '2px solid #ddd', borderTop: 'none',
+      borderRadius: '0 0 10px 10px',
+      padding: '12px 14px',
+      fontSize: '14px', color: '#888',
+    }}>
+      Sin resultados para "<strong>{texto}</strong>"
+    </div>,
+    document.body
+  ) : null
 
   return (
     <div ref={contenedorRef} style={{ position: 'relative', ...style }}>
@@ -94,7 +175,7 @@ export const SearchSelect = ({
           }}
         />
 
-        {/* Etiqueta del valor seleccionado (cuando no se está buscando) */}
+        {/* Etiqueta del valor seleccionado */}
         {!abierto && value && (
           <div style={{
             position: 'absolute', inset: 0,
@@ -131,70 +212,7 @@ export const SearchSelect = ({
         </div>
       </div>
 
-      {/* Lista desplegable */}
-      {abierto && filtradas.length > 0 && (
-        <div ref={listaRef} style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          zIndex: 1000,
-          backgroundColor: 'white',
-          border: '2px solid #004895',
-          borderTop: 'none',
-          borderRadius: '0 0 10px 10px',
-          maxHeight: '240px', overflowY: 'auto',
-          boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
-        }}>
-          {filtradas.map((op, idx) => {
-            const lbl = op.label
-            const q = texto.toLowerCase()
-            const i = q ? lbl.toLowerCase().indexOf(q) : -1
-            return (
-              <div key={`${op.value}-${idx}`}
-                onMouseDown={(e) => { e.preventDefault(); seleccionar(op) }}
-                style={{
-                  padding: '12px 14px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  color: '#1a1a1a',
-                  backgroundColor:
-                    idx === resaltado ? '#e8f0fe'
-                    : op.value === value ? '#f0f4ff'
-                    : 'white',
-                  borderBottom: '1px solid #f0f0f0',
-                  fontWeight: op.value === value ? 700 : 400,
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}>
-                <span>
-                  {i >= 0 ? (
-                    <>
-                      {lbl.slice(0, i)}
-                      <mark style={{ backgroundColor: '#fff176', borderRadius: '2px', padding: '0 1px', color: '#1a1a1a' }}>
-                        {lbl.slice(i, i + q.length)}
-                      </mark>
-                      {lbl.slice(i + q.length)}
-                    </>
-                  ) : lbl}
-                </span>
-                {op.value === value && <span style={{ color: '#004895', fontSize: '13px' }}>✓</span>}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Sin resultados */}
-      {abierto && texto.trim() && filtradas.length === 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          zIndex: 1000,
-          backgroundColor: 'white',
-          border: '2px solid #ddd', borderTop: 'none',
-          borderRadius: '0 0 10px 10px',
-          padding: '12px 14px',
-          fontSize: '14px', color: '#888',
-        }}>
-          Sin resultados para "<strong>{texto}</strong>"
-        </div>
-      )}
+      {dropdown}
     </div>
   )
 }

@@ -184,6 +184,12 @@ export default function TurnoActivo() {
     }
   }
 
+  // Resuelve código o nombre → objeto MP del maestro
+  const findMP = (val) => materiasPrimas.find(p =>
+    (p.Codigo || '') === val ||
+    (p.Nombre || p.Title || '').toLowerCase() === (val || '').toLowerCase()
+  )
+
   const handleGuardarMP = async () => {
     const validas = mpFilas.filter(f => f.insumo && parseFloat(f.kg) > 0)
     if (!validas.length) return
@@ -191,36 +197,41 @@ export default function TurnoActivo() {
     try {
       const token = await getToken()
       if (token && navigator.onLine) {
-        // Cargar entradas Kardex actuales de esta OF para buscar duplicados
-        const kardexActual = await getListItems(token, 'Kardex_MP', { top: 200 })
-        const kardexOF = kardexActual.filter(k => k.Numero_OF === (turnoActivo.Numero_OF || ''))
+        const kardexActual = await getListItems(token, 'Kardex_MP', {
+          filter: `Numero_OF eq '${turnoActivo.Numero_OF || ''}'`, top: 100,
+        })
 
-        await Promise.all(validas.map(f => {
+        await Promise.allSettled(validas.map(f => {
           const kgNuevo = parseFloat(f.kg)
-          const insumoKey = (f.insumo || '').trim().toLowerCase()
-          // Buscar registro existente del mismo insumo en esta OF
-          const existente = kardexOF.find(k =>
-            (k.Insumo || '').trim().toLowerCase() === insumoKey
-          )
+          const mpObj = findMP(f.insumo)
+          const insumoCodigo = mpObj?.Codigo || f.insumo
+
+          // Buscar existente tolerando que Kardex pueda tener código o nombre
+          const existente = kardexActual.find(k => {
+            const mpK = findMP(k.Insumo)
+            if (mpObj && mpK) return (mpObj.Codigo || mpObj.ID) === (mpK.Codigo || mpK.ID)
+            return (k.Insumo || '').trim().toLowerCase() === (f.insumo || '').trim().toLowerCase()
+          })
+
           if (existente) {
-            // Sumar a KgDeclaradoOperario y marcar como pendiente validación PCP
             const kgActual = existente.KgDeclaradoOperario ?? existente.KgEntregados ?? 0
             return updateListItem(token, 'Kardex_MP', existente.ID, {
-              KgDeclaradoOperario: kgActual + kgNuevo,
-              Observacion: 'Registrada por operario',
+              Insumo: insumoCodigo,
+              KgDeclaradoOperario: parseFloat((kgActual + kgNuevo).toFixed(3)),
+              Observacion: 'Actualizado por operario — pendiente validación PCP',
             })
           } else {
-            // Crear nuevo si no existe entrada para este insumo
             return createListItem(token, 'Kardex_MP', {
               Title: turnoActivo.Maquina || '',
               Fecha: new Date().toISOString(),
               Turno: turnoActivo.Turno,
-              Insumo: f.insumo,
+              Insumo: insumoCodigo,
               KgEntregados: 0,
               KgDeclaradoOperario: kgNuevo,
               KgDevueltos: 0,
-              Observacion: 'Registrada por operario',
+              Observacion: 'Declarado por operario — pendiente validación PCP',
               Numero_OF: turnoActivo.Numero_OF || '',
+              Producto: turnoActivo.Producto,
             })
           }
         }))
@@ -405,7 +416,10 @@ export default function TurnoActivo() {
                 {mpFilas.map((fila, idx) => (
                   <div key={fila.id} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 32px', gap: '8px', alignItems: 'center' }}>
                     <SearchSelect
-                      opciones={materiasPrimas.map(mp => ({ value: mp.Nombre || mp.Title || '', label: mp.Nombre || mp.Title || '' }))}
+                      opciones={materiasPrimas.map(mp => ({
+                        value: mp.Codigo || mp.Nombre || mp.Title || '',
+                        label: mp.Nombre || mp.Title || '',
+                      }))}
                       value={fila.insumo}
                       onChange={v => setMpFilas(p => p.map(f => f.id === fila.id ? { ...f, insumo: v } : f))}
                       placeholder="Insumo..."

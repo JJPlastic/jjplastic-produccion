@@ -93,7 +93,8 @@ const LABEL = { fontWeight: 600, fontSize: '14px', display: 'block', marginBotto
 const INPUT_STYLE = { width: '100%', padding: '10px', borderRadius: '8px', border: '2px solid #ddd', fontSize: '14px', fontFamily: 'inherit', color: '#1a1a1a', backgroundColor: 'white' }
 
 // ─── Modal de corrección ──────────────────────────────────────────────────────
-const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [], registrosTurno, kgPorUnidadMap, tiposInsumo = {}, onGuardar, onCerrar, guardando }) => {
+const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [], registrosTurno, kgPorUnidadMap, tiposInsumo = {}, nombresProductos = {}, onGuardar, onCerrar, guardando }) => {
+  const resolverNombreInsumo = (val) => (val ? (nombresProductos[val.trim()] || val.trim()) : val)
   // Filtrar solo insumos tipo Base (MP estructural — no colorantes)
   const itemsBase = itemsKardexTurno.filter(k => {
     const nombre = (k.Insumo || '').toLowerCase()
@@ -436,11 +437,12 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
           <div style={{ backgroundColor: 'white', borderRadius: '10px', border: '1.5px solid #c5cae9', padding: '10px 12px' }}>
             <label style={{ fontSize: '11px', fontWeight: 700, color: '#004895', display: 'block', marginBottom: '4px' }}>
               Kg usado en producción
-              {(registro.Insumo_Base || itemsBase.map(k => k.Insumo).join(', ')) && (
-                <span style={{ marginLeft: '6px', color: '#555', fontWeight: 600 }}>
-                  ({registro.Insumo_Base || itemsBase.map(k => k.Insumo).join(', ')})
-                </span>
-              )}
+              {(() => {
+                const raw = registro.Insumo_Base || itemsBase.map(k => k.Insumo).join(', ')
+                if (!raw) return null
+                const nombres = raw.split(',').map(resolverNombreInsumo).join(', ')
+                return <span style={{ marginLeft: '6px', color: '#555', fontWeight: 600 }}>({nombres})</span>
+              })()}
             </label>
             <input type="number" step="0.01" min="0"
               value={mpLineaEdits.MP_KgUsado ?? ''}
@@ -503,6 +505,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
   const [guardando, setGuardando] = useState(false)
 
   const cargar = useCallback(async () => {
+    if (!navigator.onLine) return
     setCargando(true)
     try {
       const token = await getToken()
@@ -592,6 +595,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
       }
     }
 
+    if (!navigator.onLine) { alert('Sin conexión a internet. Intenta nuevamente cuando recuperes la conexión.'); return }
     setGuardando(true)
     try {
       const token = await getToken()
@@ -979,6 +983,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
             kgPorUnidad={productos[modalReg.Producto] ?? 0}
             kgPorUnidadMap={productos}
             tiposInsumo={tiposInsumo}
+            nombresProductos={nombresProductos}
             kgKardex={kgKardex}
             itemsKardexTurno={itemsKardexTurno}
             registrosTurno={registrosTurno}

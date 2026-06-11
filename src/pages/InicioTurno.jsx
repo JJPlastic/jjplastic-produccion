@@ -66,6 +66,7 @@ export default function InicioTurno() {
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm()
   const [enviando, setEnviando]             = useState(false)
   const [feedback, setFeedback]             = useState(null)
+  const [intentoEnviar, setIntentoEnviar]   = useState(false)
   const [ofsActivas, setOfsActivas]         = useState([])
   const [ofSeleccionada, setOfSeleccionada] = useState(null)
   const [productoOfSel, setProductoOfSel]   = useState('') // producto elegido dentro de la OF
@@ -158,6 +159,10 @@ export default function InicioTurno() {
   }, [operarios, usuario?.email])
 
   const onSubmit = async (data) => {
+    setIntentoEnviar(true)
+    const filasValidasPrev = filasMP.filter(f => f.mp && parseFloat(f.kg) > 0)
+    if (!ofSeleccionada && filasValidasPrev.length === 0) return
+
     setEnviando(true)
     const ahora = new Date()
 
@@ -257,19 +262,20 @@ export default function InicioTurno() {
 
         if (filasValidasMP.length > 0) {
           if (!ofSeleccionada?.tieneKardex) {
-            // Operario va primero → crear entradas nuevas en Kardex
-            await Promise.all(filasValidasMP.map(f =>
+            // Operario va primero — KgEntregados = 0 (PCP valida después)
+            // Producto: código resuelto de la fila o, si vacío, el producto del turno
+            await Promise.allSettled(filasValidasMP.map(f =>
               createListItem(token, 'Kardex_MP', {
                 Title: tabletConfig.codigoMaquina,
                 Fecha: registroLocal.Fecha,
                 Turno: registroLocal.Turno,
                 Insumo: f.mp,
-                KgEntregados: parseFloat(f.kg),
+                KgEntregados: 0,
                 KgDeclaradoOperario: parseFloat(f.kg),
                 KgDevueltos: 0,
-                Observacion: 'Registrada por operario',
+                Observacion: 'Declarado por operario — pendiente validación PCP',
                 Numero_OF: numeroOF,
-                Producto: resolverCodigo(f.producto),
+                Producto: resolverCodigo(f.producto) || productoCodigo,
               })
             ))
           } else {
@@ -499,13 +505,16 @@ export default function InicioTurno() {
           {(() => {
             const mpOk = filasMP.some(f => f.mp && parseFloat(f.kg) > 0)
             const tieneKardex = ofSeleccionada?.tieneKardex
+            const mpRequerida = !ofSeleccionada // sin OF de PCP → MP obligatoria
+            const mpError = intentoEnviar && mpRequerida && !mpOk
             return (
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${mpOk ? '#004895' : '#e0e0e0'}` }}>
-            <div style={{ backgroundColor: mpOk ? '#004895' : '#f5f5f5', padding: '8px 14px', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', border: `2px solid ${mpError ? '#d32f2f' : mpOk ? '#004895' : '#e0e0e0'}` }}>
+            <div style={{ backgroundColor: mpError ? '#d32f2f' : mpOk ? '#004895' : '#f5f5f5', padding: '8px 14px', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ backgroundColor: mpOk ? 'rgba(255,255,255,0.25)' : '#ddd', color: mpOk ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: mpOk ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  MP recibida {tieneKardex && <span style={{ fontSize: '10px', opacity: 0.85 }}>· ✓ Kardex PCP</span>}
+                <span style={{ backgroundColor: (mpError || mpOk) ? 'rgba(255,255,255,0.25)' : '#ddd', color: (mpError || mpOk) ? 'white' : '#888', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: (mpError || mpOk) ? 'white' : '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  MP recibida {mpRequerida && <span style={{ fontSize: '10px', opacity: 0.85 }}>· obligatoria</span>}
+                  {tieneKardex && <span style={{ fontSize: '10px', opacity: 0.85 }}>· ✓ Kardex PCP</span>}
                 </span>
               </div>
               {!filasMP.some(f => f.producto) && (
@@ -568,6 +577,11 @@ export default function InicioTurno() {
             {filasMP.some(f => parseFloat(f.kg) > 0) && (
               <div style={{ padding: '6px 14px 8px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: '#2e7d32', borderTop: '1px solid #f0f0f0' }}>
                 Total: {filasMP.reduce((s, f) => s + (parseFloat(f.kg) || 0), 0).toFixed(2)} kg
+              </div>
+            )}
+            {mpError && (
+              <div style={{ margin: '0 12px 10px', backgroundColor: '#ffebee', borderRadius: '8px', padding: '8px 12px', fontSize: '13px', color: '#c62828', fontWeight: 600 }}>
+                ⚠ Debes registrar al menos una MP antes de iniciar el turno.
               </div>
             )}
           </div>
