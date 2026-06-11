@@ -96,7 +96,7 @@ export const useProduccionParcial = ({ getToken, registroId, codigoLote }) => {
         data: payload,
         localId,
       })
-      const nuevo = { ...payload, ID: localId }
+      const nuevo = { ...payload, ID: localId, _offline: true }
       setParciales(prev => [...prev, nuevo])
       return nuevo
     }

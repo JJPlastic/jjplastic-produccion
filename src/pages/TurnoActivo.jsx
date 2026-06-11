@@ -196,25 +196,43 @@ export default function TurnoActivo() {
     const validas = mpFilas.filter(f => f.insumo && parseFloat(f.kg) > 0)
     if (!validas.length) return
     setGuardandoMP(true)
+
+    // Helper: encolar cada fila como create para sync posterior
+    const encolarFilas = (obs) => Promise.allSettled(validas.map(f => {
+      const insumoCodigo = findMP(f.insumo)?.Codigo || f.insumo
+      return encolarOperacion({
+        tipo: 'create',
+        listName: 'Kardex_MP',
+        data: {
+          Title: turnoActivo.Maquina || '',
+          Fecha: new Date().toISOString(),
+          Turno: turnoActivo.Turno,
+          Insumo: insumoCodigo,
+          KgEntregados: 0,
+          KgDeclaradoOperario: parseFloat(f.kg),
+          KgDevueltos: 0,
+          Observacion: obs,
+          Numero_OF: turnoActivo.Numero_OF || '',
+          Producto: turnoActivo.Producto,
+        },
+      })
+    }))
+
     try {
       const token = await getToken()
       if (token && navigator.onLine) {
         const kardexActual = await getListItems(token, 'Kardex_MP', {
           filter: `Numero_OF eq '${turnoActivo.Numero_OF || ''}'`, top: 100,
         })
-
         await Promise.allSettled(validas.map(f => {
           const kgNuevo = parseFloat(f.kg)
           const mpObj = findMP(f.insumo)
           const insumoCodigo = mpObj?.Codigo || f.insumo
-
-          // Buscar existente tolerando que Kardex pueda tener código o nombre
           const existente = kardexActual.find(k => {
             const mpK = findMP(k.Insumo)
             if (mpObj && mpK) return (mpObj.Codigo || mpObj.ID) === (mpK.Codigo || mpK.ID)
             return (k.Insumo || '').trim().toLowerCase() === (f.insumo || '').trim().toLowerCase()
           })
-
           if (existente) {
             const kgActual = existente.KgDeclaradoOperario ?? existente.KgEntregados ?? 0
             return updateListItem(token, 'Kardex_MP', existente.ID, {
@@ -237,12 +255,19 @@ export default function TurnoActivo() {
             })
           }
         }))
+        setToast({ mensaje: '✓ MP guardada en Kardex.', tipo: 'ok' })
+      } else {
+        await encolarFilas('Declarado por operario (sin red) — pendiente validación PCP')
+        setToast({ mensaje: 'Sin red — MP guardada localmente, se enviará al reconectar.', tipo: 'warn' })
       }
       setModalMP(false)
       setMpFilas([{ id: crypto.randomUUID(), insumo: '', kg: '' }])
-      setToast({ mensaje: '✓ MP guardada en Kardex.', tipo: 'ok' })
     } catch (err) {
-      setToast({ mensaje: mensajeRed(err), tipo: 'error' })
+      // Red disponible pero falló — encolar igual
+      await encolarFilas('Declarado por operario (error red) — pendiente validación PCP')
+      setModalMP(false)
+      setMpFilas([{ id: crypto.randomUUID(), insumo: '', kg: '' }])
+      setToast({ mensaje: 'Sin red — MP guardada localmente, se enviará al reconectar.', tipo: 'warn' })
     } finally {
       setGuardandoMP(false)
     }
@@ -254,7 +279,7 @@ export default function TurnoActivo() {
     if (conf === 0 && def === 0) return
     setGuardandoParcial(true)
     try {
-      await agregarParcial({
+      const resultado = await agregarParcial({
         undConformes:   conf,
         undDefectuosas: def,
         operario:       turnoActivo.Operario,
@@ -262,6 +287,9 @@ export default function TurnoActivo() {
       })
       setModalParcial(false)
       setParcConf(''); setParcDef(''); setParcObs('')
+      if (resultado?._offline) {
+        setToast({ mensaje: 'Sin red — parcial guardado localmente, se enviará al reconectar.', tipo: 'warn' })
+      }
     } catch (err) {
       setToast({ mensaje: mensajeRed(err), tipo: 'error' })
     } finally {
