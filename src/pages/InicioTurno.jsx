@@ -286,7 +286,11 @@ export default function InicioTurno() {
             const kardexActual = await getListItems(token, 'Kardex_MP', {
               filter: `Numero_OF eq '${numeroOF}'`, top: 100,
             })
-            const kardexOF = kardexActual
+
+            // Solo los entries de ESTA máquina (transferencias traen entries de otras máqs con el mismo OF)
+            const kardexOF = kardexActual.filter(k =>
+              (k.Title || '').trim() === tabletConfig.codigoMaquina
+            )
 
             // Promise.allSettled: cada entrada se intenta de forma independiente
             await Promise.allSettled(filasValidasMP.map(async f => {
