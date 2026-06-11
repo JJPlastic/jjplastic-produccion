@@ -416,7 +416,7 @@ export default function BienvenidaOperario() {
                       padding: '5px 4px',
                       borderBottom: i < mps.length - 1 ? '1px solid #f0f0f0' : 'none',
                     }}>
-                      <span style={{ fontSize: '13px', color: '#555' }}>• {m.insumo}</span>
+                      <span style={{ fontSize: '13px', color: '#555' }}>• {resolverNombre(m.insumo)}</span>
                       <span style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: 700 }}>
                         {(m.kg - m.kgDev).toFixed(2)} kg
                       </span>
