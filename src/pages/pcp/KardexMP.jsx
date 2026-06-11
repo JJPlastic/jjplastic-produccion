@@ -346,34 +346,37 @@ export default function KardexMP({ onVolver, onLogout }) {
       const ahora = new Date()
       const nota = `Transferido a ${maqDestinoSel} · ${format(ahora, 'dd/MM/yyyy HH:mm')}`
 
-      // Calcular kg disponibles por insumo (no usados/devueltos aún)
-      const porInsumo = {}
+      // Calcular kg disponibles agrupados por Producto + Insumo
+      const porProdInsumo = {}
       grupo.items.forEach(e => {
-        const key = (e.Insumo || '').trim().toLowerCase()
-        if (!porInsumo[key]) porInsumo[key] = { nombre: e.Insumo, disponible: 0, entries: [] }
+        const prod    = (e.Producto || '').trim()
+        const insumo  = (e.Insumo   || '').trim().toLowerCase()
+        const key     = `${prod}||${insumo}`
+        if (!porProdInsumo[key]) porProdInsumo[key] = { producto: e.Producto || '', insumo: e.Insumo, disponible: 0, entries: [] }
         const disp = Math.max(0,
           (e.KgEntregados || 0) - (e.KgUsado || 0) - (e.KgMermaRec || 0)
           - (e.KgMermaNoRec || 0) - (e.KgDevueltos || 0)
         )
-        porInsumo[key].disponible += disp
-        porInsumo[key].entries.push({ ...e, disp })
+        porProdInsumo[key].disponible += disp
+        porProdInsumo[key].entries.push({ ...e, disp })
       })
 
-      const insumosATransferir = Object.values(porInsumo).filter(i => i.disponible > 0.001)
+      const insumosATransferir = Object.values(porProdInsumo).filter(i => i.disponible > 0.001)
       if (!insumosATransferir.length) {
         setToast({ mensaje: 'No hay kg disponibles para transferir en este grupo.', tipo: 'warn' })
         setGuardandoTransf(false)
         return
       }
 
-      // Crear entradas nuevas en máquina destino
-      await Promise.all(insumosATransferir.map(insumo =>
+      // Crear una entrada por Producto + Insumo en la máquina destino
+      await Promise.all(insumosATransferir.map(item =>
         createListItem(token, 'Kardex_MP', {
           Title: maqDestinoSel,
           Fecha: ahora.toISOString(),
           Turno: grupo.turno,
-          Insumo: insumo.nombre,
-          KgEntregados: parseFloat(insumo.disponible.toFixed(3)),
+          Insumo: item.insumo,
+          Producto: item.producto,
+          KgEntregados: parseFloat(item.disponible.toFixed(3)),
           KgDevueltos: 0,
           Numero_OF: grupo.numeroOF || '',
           Observacion: `Recibido desde ${grupo.maquina} · ${format(ahora, 'dd/MM/yyyy HH:mm')}`,
@@ -382,8 +385,8 @@ export default function KardexMP({ onVolver, onLogout }) {
 
       // Marcar kg como transferidos en entradas originales (suman a KgDevueltos con nota)
       await Promise.all(
-        insumosATransferir.flatMap(insumo =>
-          insumo.entries.filter(e => e.disp > 0.001).map(e =>
+        insumosATransferir.flatMap(item =>
+          item.entries.filter(e => e.disp > 0.001).map(e =>
             updateListItem(token, 'Kardex_MP', e.ID, {
               KgDevueltos: parseFloat(((e.KgDevueltos || 0) + e.disp).toFixed(3)),
               Observacion: e.Observacion ? `${nota} · ${e.Observacion}` : nota,
@@ -1159,20 +1162,32 @@ export default function KardexMP({ onVolver, onLogout }) {
       {/* Modal Transferir kg restantes */}
       {modalTransferir && (() => {
         const grupo = modalTransferir.grupo
-        const porInsumo = {}
+        // Agrupar por Producto + Insumo para mostrar desglose
+        const porProdInsumoModal = {}
         grupo.items.forEach(e => {
-          const key = (e.Insumo || '').trim().toLowerCase()
-          if (!porInsumo[key]) porInsumo[key] = { nombre: e.Insumo, disponible: 0 }
-          porInsumo[key].disponible += Math.max(0,
+          const prod   = (e.Producto || '').trim()
+          const insumo = (e.Insumo   || '').trim().toLowerCase()
+          const key    = `${prod}||${insumo}`
+          if (!porProdInsumoModal[key]) porProdInsumoModal[key] = { producto: e.Producto || '', insumo: e.Insumo, disponible: 0 }
+          porProdInsumoModal[key].disponible += Math.max(0,
             (e.KgEntregados || 0) - (e.KgUsado || 0) - (e.KgMermaRec || 0)
             - (e.KgMermaNoRec || 0) - (e.KgDevueltos || 0)
           )
         })
-        const insumosDisp = Object.values(porInsumo).filter(i => i.disponible > 0.001)
-        const totalKgDisp = insumosDisp.reduce((s, i) => s + i.disponible, 0)
+        const insumosDisp  = Object.values(porProdInsumoModal).filter(i => i.disponible > 0.001)
+        const totalKgDisp  = insumosDisp.reduce((s, i) => s + i.disponible, 0)
+
+        // Agrupar por producto para display
+        const porProdDisplay = {}
+        insumosDisp.forEach(i => {
+          const p = i.producto || '—'
+          if (!porProdDisplay[p]) porProdDisplay[p] = []
+          porProdDisplay[p].push(i)
+        })
+
         return (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '16px' }}>
-            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '420px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <h3 style={{ color: '#0288d1', fontSize: '16px', fontWeight: 700, margin: 0 }}>→ Transferir kg restantes</h3>
@@ -1184,17 +1199,24 @@ export default function KardexMP({ onVolver, onLogout }) {
               </div>
 
               <div style={{ backgroundColor: '#e3f7fd', borderRadius: '10px', padding: '12px' }}>
-                <p style={{ fontSize: '12px', color: '#555', margin: '0 0 6px' }}>Kg disponibles para transferir</p>
+                <p style={{ fontSize: '12px', color: '#555', margin: '0 0 8px' }}>Kg disponibles para transferir (por producto)</p>
                 {insumosDisp.length === 0 ? (
                   <p style={{ fontSize: '13px', color: '#e65100', margin: 0 }}>⚠ No hay kg disponibles — todos fueron usados o devueltos.</p>
-                ) : insumosDisp.map(i => (
-                  <div key={i.nombre} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {resolverNombreMaestro(i.nombre)}</span>
-                    <strong style={{ fontSize: '13px', color: '#0288d1' }}>{i.disponible.toFixed(2)} kg</strong>
+                ) : Object.entries(porProdDisplay).map(([prod, items]) => (
+                  <div key={prod} style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#0277bd', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', paddingBottom: '3px', borderBottom: '1px solid #b3e5fc' }}>
+                      {resolverNombreMaestro(prod) || '—'}
+                    </div>
+                    {items.map(i => (
+                      <div key={i.insumo} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', paddingLeft: '8px' }}>
+                        <span style={{ fontSize: '13px', color: '#1a1a1a' }}>• {resolverNombreMaestro(i.insumo)}</span>
+                        <strong style={{ fontSize: '13px', color: '#0288d1' }}>{i.disponible.toFixed(2)} kg</strong>
+                      </div>
+                    ))}
                   </div>
                 ))}
                 {insumosDisp.length > 0 && (
-                  <div style={{ borderTop: '1px solid #b3e5fc', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ borderTop: '1px solid #b3e5fc', marginTop: '4px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
                     <strong style={{ fontSize: '13px', color: '#555' }}>Total</strong>
                     <strong style={{ fontSize: '14px', color: '#0288d1' }}>{totalKgDisp.toFixed(2)} kg</strong>
                   </div>
@@ -1215,7 +1237,7 @@ export default function KardexMP({ onVolver, onLogout }) {
 
               {maqDestinoSel && insumosDisp.length > 0 && (
                 <div style={{ backgroundColor: '#f0f4ff', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#555' }}>
-                  Se crearán <strong>{insumosDisp.length} entrada(s)</strong> en <strong>{maqDestinoSel}</strong> con la OF <span style={{ fontFamily: 'monospace' }}>{grupo.numeroOF}</span>.
+                  Se crearán <strong>{insumosDisp.length} entrada(s)</strong> en <strong>{maqDestinoSel}</strong> con la OF <span style={{ fontFamily: 'monospace' }}>{grupo.numeroOF}</span>, asociadas a su producto.
                   Los kg en <strong>{grupo.maquina}</strong> quedarán registrados como transferidos.
                 </div>
               )}
