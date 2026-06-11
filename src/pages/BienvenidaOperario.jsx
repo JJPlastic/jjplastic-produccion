@@ -249,102 +249,6 @@ export default function BienvenidaOperario() {
           </div>
         )))}
 
-        {/* ── OF preparada por PCP ── */}
-        {ofsKardex.length > 0 ? ofsKardex.map(of => (
-          <div key={of.of} style={{
-            backgroundColor: 'white',
-            borderRadius: '18px',
-            overflow: 'hidden',
-            boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #2e7d32, #43a047)',
-              padding: '10px 16px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <span style={{ fontSize: '11px', color: 'white', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                📦 MP preparada por PCP
-              </span>
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace' }}>{of.of}</span>
-            </div>
-            <div style={{ padding: '10px 16px 0' }}>
-              {of.mpPorProducto && Object.entries(of.mpPorProducto).map(([prod, mps], pIdx) => (
-                <div key={prod || pIdx} style={{ marginBottom: '8px' }}>
-                  {/* Sub-cabecera de producto */}
-                  <div style={{
-                    backgroundColor: '#f0fff4',
-                    borderLeft: '3px solid #2e7d32',
-                    padding: '5px 10px',
-                    marginBottom: '4px',
-                    borderRadius: '0 6px 6px 0',
-                  }}>
-                    <p style={{ fontSize: '13px', fontWeight: 800, color: '#2e7d32', margin: 0 }}>
-                      {prod ? resolverNombre(prod) : '—'}
-                    </p>
-                  </div>
-                  {/* MPs de este producto */}
-                  {mps.map((m, i) => (
-                    <div key={i} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '5px 4px',
-                      borderBottom: i < mps.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    }}>
-                      <span style={{ fontSize: '13px', color: '#555' }}>• {m.insumo}</span>
-                      <span style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: 700 }}>
-                        {(m.kg - m.kgDev).toFixed(2)} kg
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: '12px' }}>
-              <button
-                onClick={() => { setOfPreseleccionada(of); setPantalla('inicio-turno') }}
-                style={{
-                  width: '100%', padding: '14px',
-                  background: 'linear-gradient(135deg, #2e7d32, #43a047)',
-                  color: 'white', border: 'none', borderRadius: '10px',
-                  fontSize: '15px', fontWeight: 800, cursor: 'pointer',
-                  boxShadow: '0 3px 10px rgba(46,125,50,0.35)',
-                }}>
-                ▶ Iniciar turno con OF
-              </button>
-            </div>
-          </div>
-        )) : (
-          <div style={{
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            borderRadius: '16px',
-            padding: '16px',
-            border: '1.5px solid rgba(255,255,255,0.18)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-              <span style={{ fontSize: '28px', flexShrink: 0 }}>📦</span>
-              <div>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>
-                  MP preparada por PCP
-                </p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', margin: 0 }}>
-                  PCP aún no registró MP para esta máquina
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setPantalla('inicio-turno')}
-              style={{
-                width: '100%', padding: '13px',
-                backgroundColor: 'white', color: '#004895',
-                border: 'none', borderRadius: '10px',
-                fontSize: '14px', fontWeight: 800, cursor: 'pointer',
-              }}>
-              ▶ Iniciar turno sin OF de PCP
-            </button>
-          </div>
-        )}
-
         {/* ── Última OF ── */}
         {ultimoReg ? (
           <div style={{
@@ -468,23 +372,104 @@ export default function BienvenidaOperario() {
               )}
             </div>
           </div>
-        ) : (
-          <div style={{
-            backgroundColor: 'rgba(255,255,255,0.08)',
-            borderRadius: '16px',
-            padding: '24px 16px',
-            border: '1.5px solid rgba(255,255,255,0.12)',
-            textAlign: 'center',
+        ) : null}
+
+        {/* ── OF preparada por PCP ── */}
+        {ofsKardex.length > 0 ? ofsKardex.map(of => (
+          <div key={of.of} style={{
+            backgroundColor: 'white',
+            borderRadius: '18px',
+            overflow: 'hidden',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
           }}>
-            <p style={{ fontSize: '36px', margin: '0 0 8px' }}>🏭</p>
-            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: '0 0 4px' }}>
-              Aún no se produjo nada en esta máquina hoy.
-            </p>
-            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>
-              Inicia un turno con la OF asignada por PCP
-            </p>
+            <div style={{
+              background: 'linear-gradient(135deg, #2e7d32, #43a047)',
+              padding: '10px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <span style={{ fontSize: '11px', color: 'white', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                📦 MP preparada por PCP
+              </span>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace' }}>{of.of}</span>
+            </div>
+            <div style={{ padding: '10px 16px 0' }}>
+              {of.mpPorProducto && Object.entries(of.mpPorProducto).map(([prod, mps], pIdx) => (
+                <div key={prod || pIdx} style={{ marginBottom: '8px' }}>
+                  {/* Sub-cabecera de producto */}
+                  <div style={{
+                    backgroundColor: '#f0fff4',
+                    borderLeft: '3px solid #2e7d32',
+                    padding: '5px 10px',
+                    marginBottom: '4px',
+                    borderRadius: '0 6px 6px 0',
+                  }}>
+                    <p style={{ fontSize: '13px', fontWeight: 800, color: '#2e7d32', margin: 0 }}>
+                      {prod ? resolverNombre(prod) : '—'}
+                    </p>
+                  </div>
+                  {/* MPs de este producto */}
+                  {mps.map((m, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '5px 4px',
+                      borderBottom: i < mps.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    }}>
+                      <span style={{ fontSize: '13px', color: '#555' }}>• {m.insumo}</span>
+                      <span style={{ fontSize: '13px', color: '#1a1a1a', fontWeight: 700 }}>
+                        {(m.kg - m.kgDev).toFixed(2)} kg
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '12px' }}>
+              <button
+                onClick={() => { setOfPreseleccionada(of); setPantalla('inicio-turno') }}
+                style={{
+                  width: '100%', padding: '14px',
+                  background: 'linear-gradient(135deg, #2e7d32, #43a047)',
+                  color: 'white', border: 'none', borderRadius: '10px',
+                  fontSize: '15px', fontWeight: 800, cursor: 'pointer',
+                  boxShadow: '0 3px 10px rgba(46,125,50,0.35)',
+                }}>
+                ▶ Iniciar turno con OF
+              </button>
+            </div>
+          </div>
+        )) : (
+          <div style={{
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            borderRadius: '16px',
+            padding: '16px',
+            border: '1.5px solid rgba(255,255,255,0.18)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <span style={{ fontSize: '28px', flexShrink: 0 }}>📦</span>
+              <div>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>
+                  MP preparada por PCP
+                </p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', margin: 0 }}>
+                  PCP aún no registró MP para esta máquina
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setPantalla('inicio-turno')}
+              style={{
+                width: '100%', padding: '13px',
+                backgroundColor: 'white', color: '#004895',
+                border: 'none', borderRadius: '10px',
+                fontSize: '14px', fontWeight: 800, cursor: 'pointer',
+              }}>
+              ▶ Iniciar turno sin OF de PCP
+            </button>
           </div>
         )}
+
 
       </div>
     </div>
