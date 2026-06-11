@@ -157,7 +157,7 @@ export default function BienvenidaOperario() {
     return saldo > 0.01
   })
   // Si el último turno fue cerrado con "se transfiere", la OF pasa a otra máquina
-  const fueTransferida = ultimoReg?.Transferencia_Pendiente === true
+  const fueTransferida = !!(ultimoReg?.Transferencia_Pendiente)
   const puedeContinuar = haySaldoMP && !fueTransferida
 
   return (

@@ -129,7 +129,7 @@ export default function KardexMP({ onVolver, onLogout }) {
         const regsTransf = await getListItems(token, 'Registro_Produccion', { top: 200 })
         const conFlag = new Set(
           regsTransf
-            .filter(r => r.Transferencia_Pendiente === true)
+            .filter(r => !!(r.Transferencia_Pendiente))
             .map(r => r.Numero_OF)
             .filter(Boolean)
         )
@@ -397,7 +397,7 @@ export default function KardexMP({ onVolver, onLogout }) {
         try {
           const regs = await getListItems(token, 'Registro_Produccion', { top: 200 })
           const conFlag = regs.filter(r =>
-            r.Numero_OF === grupo.numeroOF && r.Transferencia_Pendiente === true
+            r.Numero_OF === grupo.numeroOF && !!(r.Transferencia_Pendiente)
           )
           await Promise.all(conFlag.map(r =>
             updateListItem(token, 'Registro_Produccion', r.ID, { Transferencia_Pendiente: false })

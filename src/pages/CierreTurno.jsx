@@ -268,7 +268,6 @@ export default function CierreTurno() {
       UnidadesDefectuosas: undDefectuosas,
       Estado_Validacion:   estadoValidacion,
       Paradas:             turnoActivo.Paradas || '[]',
-      Transferencia_Pendiente: transferenciaPendiente === true,
       // MP — campos principales del registro de producción
       MP_KgUsado:          parseFloat(mpBaseTotal.toFixed(3)),
       Insumo_Base:         insumoBaseNombre,
@@ -288,7 +287,7 @@ export default function CierreTurno() {
       ...(obsPcpAuto ? { Obs_PCP: obsPcpAuto } : {}),
     }
 
-    const todoPayload = { ...p1, ...p2, ...p3 }
+    const todoPayload = { ...p1, ...p2, ...p3, Transferencia_Pendiente: transferenciaPendiente === true }
 
     try {
       const token = await getToken()
@@ -304,6 +303,13 @@ export default function CierreTurno() {
 
         // Nivel 1 — DEBE guardarse (Estado + HoraFin)
         await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, p1)
+
+        // Nivel 1.5 — flag de transferencia (columna Transferencia_Pendiente, save aislado)
+        try {
+          await updateListItem(token, 'Registro_Produccion', turnoActivo.spId, {
+            Transferencia_Pendiente: transferenciaPendiente === true,
+          })
+        } catch { /* columna puede no existir aún */ }
 
         // Nivel 2 — datos de producción
         try {
