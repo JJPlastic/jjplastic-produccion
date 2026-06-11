@@ -6,6 +6,12 @@ import { msalConfig } from './config/authConfig'
 import './index.css'
 import App from './App.jsx'
 
+// Cuando un chunk JS no existe tras un nuevo deploy, Vite falla al importarlo
+// dinámicamente. Recargar obtiene el nuevo index.html con los hashes actuales.
+window.addEventListener('vite:preloadError', () => {
+  window.location.reload()
+})
+
 async function bootstrap() {
   const msalInstance = new PublicClientApplication(msalConfig)
   // MSAL v3+ requiere initialize() antes de cualquier operación

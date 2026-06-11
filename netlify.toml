@@ -2,6 +2,14 @@
   command = "npm run build"
   publish = "dist"
 
+# Assets faltantes (chunks con hash viejo tras nuevo deploy) → 404 limpio,
+# no HTML. Esto permite que vite:preloadError lo capture y recargue la página.
+[[redirects]]
+  from = "/assets/*"
+  to = "/index.html"
+  status = 404
+
+# SPA: todas las rutas de la app apuntan al index
 [[redirects]]
   from = "/*"
   to = "/index.html"

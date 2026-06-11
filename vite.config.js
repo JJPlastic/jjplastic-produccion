@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => ({
         // Forzar activación del SW sin esperar que el usuario cierre todas las tabs
         skipWaiting: true,
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
       devOptions: {
         enabled: false, // No activar SW en dev para evitar interferencias con HMR
