@@ -68,7 +68,34 @@ const Login = () => {
   )
 }
 
-// Pantalla de selección de rol
+// Pantalla sin acceso configurado
+const SinAcceso = ({ email, onLogout }) => (
+  <div style={{
+    minHeight: '100vh',
+    background: 'linear-gradient(160deg, #003570 0%, #004895 60%, #005db0 100%)',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    padding: '32px', gap: '20px',
+  }}>
+    <div style={{ fontSize: '48px' }}>🔒</div>
+    <div style={{ textAlign: 'center', color: 'white' }}>
+      <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Sin acceso configurado</h2>
+      <p style={{ fontSize: '13px', opacity: 0.6, maxWidth: '280px' }}>
+        La cuenta <strong>{email}</strong> no tiene rol asignado en el sistema.
+      </p>
+      <p style={{ fontSize: '12px', opacity: 0.45, marginTop: '8px' }}>
+        Contacta al administrador para que configure tu acceso en Maestro_Operarios.
+      </p>
+    </div>
+    <button onClick={onLogout} style={{
+      background: 'transparent', color: 'rgba(255,255,255,0.6)',
+      border: '1px solid rgba(255,255,255,0.25)', borderRadius: '8px',
+      padding: '10px 20px', fontSize: '13px', cursor: 'pointer',
+    }}>Cerrar sesión</button>
+  </div>
+)
+
+// Pantalla de selección de rol (solo para BI al cambiar de rol)
 const SelectorRol = () => {
   const { seleccionarRol } = useApp()
   const { usuario, logout } = useMsal()
@@ -102,8 +129,9 @@ const SelectorRol = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
         {[
-          { rol: 'pcp', icon: '📋', label: 'PCP / Supervisor', desc: 'Validación y Kardex de MP', color: '#37BEEC', colorDk: '#0288d1' },
-          { rol: 'gerencia', icon: '📊', label: 'Gerencia', desc: 'Panel de producción en tiempo real', color: '#7b1fa2', colorDk: '#4a148c' },
+          { rol: 'operario',  icon: '🏭', label: 'Operario',       desc: 'Registro de producción en planta',    color: '#F8A12F', colorDk: '#e6901e' },
+          { rol: 'pcp',      icon: '📋', label: 'PCP / Supervisor', desc: 'Validación y Kardex de MP',          color: '#37BEEC', colorDk: '#0288d1' },
+          { rol: 'gerencia', icon: '📊', label: 'Gerencia',         desc: 'Panel de producción en tiempo real', color: '#7b1fa2', colorDk: '#4a148c' },
         ].map(({ rol, icon, label, desc, color, colorDk }) => (
           <button key={rol} onClick={() => seleccionarRol(rol)} style={{
             background: `linear-gradient(135deg, ${color}, ${colorDk})`,
@@ -173,19 +201,23 @@ const RouterGerencia = () => (
 )
 
 const Router = () => {
-  const { pantalla, cargandoInicial, rol, seleccionarRol, setRolCuenta } = useApp()
-  const { msalInstance, getToken, usuario } = useMsal()
+  const { pantalla, cargandoInicial, rol, seleccionarRol, rolCuenta, setRolCuenta } = useApp()
+  const { msalInstance, getToken, usuario, logout } = useMsal()
   const [detectando, setDetectando] = useState(false)
+  const [sinAcceso, setSinAcceso]   = useState(false)
 
   useSyncQueue({ msalInstance })
 
   // Detectar rol automáticamente desde Maestro_Operarios al iniciar sesión.
-  // Solo corre si rol === null (evita sobreescribir una selección manual)
+  // Solo corre si rol === null (evita sobreescribir una selección manual de BI)
   useEffect(() => {
     if (rol !== null || !usuario?.email) return
+    // Si ya sabemos que es BI (volvió de ⇄ Rol), no re-detectar
+    if (rolCuenta === 'bi') return
     let cancelled = false
     const detectar = async () => {
       setDetectando(true)
+      setSinAcceso(false)
       try {
         const token = await getToken()
         if (!token || cancelled) return
@@ -198,20 +230,24 @@ const Router = () => {
           const rolNorm = match.Rol.toLowerCase().replace(/\s/g, '')
           setRolCuenta(rolNorm)
           seleccionarRol(rolNorm)
+        } else {
+          setSinAcceso(true)
         }
-        // Si no hay match → muestra SelectorRol (fallback manual)
       } catch {
-        // Sin conexión o lista vacía → SelectorRol como fallback
+        setSinAcceso(true)
       } finally {
         if (!cancelled) setDetectando(false)
       }
     }
     detectar()
     return () => { cancelled = true }
-  }, [usuario?.email])
+  }, [usuario?.email, rol])
 
   if (cargandoInicial || detectando) return <LoadingSpinner mensaje="Verificando acceso..." />
-  if (!rol) return <SelectorRol />
+  // BI presionó ⇄ Rol → mostrar selector para elegir a qué pantalla ir
+  if (!rol && rolCuenta === 'bi') return <SelectorRol />
+  // Email sin acceso configurado
+  if (!rol || sinAcceso) return <SinAcceso email={usuario?.email} onLogout={logout} />
   if (rol === 'gerencia') return <RouterGerencia />
   if (ROLES_PCP.includes(rol)) return <RouterPCP />  // PCP/Jefe/BI → nunca necesitan seleccionar máquina
 
