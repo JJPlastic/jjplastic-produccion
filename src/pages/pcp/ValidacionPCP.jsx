@@ -257,28 +257,13 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
             </div>
           )}
 
-          <div style={{ backgroundColor: (analisis.diferenciaPct||0) > 8 ? '#fff3f3' : '#f3fff3', borderRadius: '10px', padding: '12px', fontSize: '13px', border: `1px solid ${colorDif}40`, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {kgKardex != null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#888', fontSize: '12px' }}>MP total OF (Kardex):</span>
-                <span style={{ color: '#888', fontSize: '12px' }}>{kgKardex.toFixed(2)} kg</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#555' }}>MP real Base (operario):</span>
-              <strong style={{ color: '#111' }}>{(registro.MP_KgUsado ?? 0).toFixed(2)} kg</strong>
-            </div>
-            {(() => {
-              // MP real: MP_KgUsado (real Base declarado por operario), editado por PCP si aplica
-              const mpCons = parseFloat(mpLineaEdits.MP_KgUsado) || registro.MP_KgUsado || analisis.mpConsumida || 0
-              // Producción declarada: usar edits si PCP los cambió, sino valores originales
+          {(() => {
+              const mpCons = mpLineaEdits.MP_KgUsado !== '' ? (parseFloat(mpLineaEdits.MP_KgUsado) || 0) : (registro.MP_KgUsado || analisis.mpConsumida || 0)
               const confVal = edits.UnidadesConformes !== '' ? (parseInt(edits.UnidadesConformes) || 0) : (registro.UnidadesConformes || 0)
               const defVal  = edits.UnidadesDefectuosas !== '' ? (parseInt(edits.UnidadesDefectuosas) || 0) : (registro.UnidadesDefectuosas || 0)
               const prodDec = confVal + defVal
-              // MP teórica = Producción declarada × KgPorUnidad
               const mpTeo   = kgPorUnidad > 0 ? prodDec * kgPorUnidad
                              : (registro.Produccion_Teorica != null ? Number(registro.Produccion_Teorica) : null)
-              // Diferencia MP = |consumida - teórica| / consumida × 100
               const difPct  = mpCons > 0 && mpTeo != null
                              ? Math.abs(mpCons - mpTeo) / mpCons * 100
                              : (registro.Diferencia_Pct != null ? Number(registro.Diferencia_Pct) : null)
@@ -286,7 +271,17 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
               const colorD  = difPct == null ? '#555' : difPct > 8 ? '#c62828' : '#2e7d32'
               const prodTeo = kgPorUnidad > 0 && mpCons > 0 ? Math.round(mpCons / kgPorUnidad) : null
               return (
-                <>
+                <div style={{ backgroundColor: (difPct||0) > 8 ? '#fff3f3' : '#f3fff3', borderRadius: '10px', padding: '12px', fontSize: '13px', border: `1px solid ${colorD}40`, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {kgKardex != null && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#888', fontSize: '12px' }}>MP total OF (Kardex):</span>
+                      <span style={{ color: '#888', fontSize: '12px' }}>{kgKardex.toFixed(2)} kg</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#555' }}>MP real Base (operario):</span>
+                    <strong style={{ color: '#111' }}>{mpCons.toFixed(2)} kg</strong>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#555' }}>MP teórica (Σ unid × kg/und):</span>
                     <strong style={{ color: '#111' }}>{mpTeo != null ? `${Number(mpTeo).toFixed(2)} kg` : '—'}</strong>
@@ -315,10 +310,9 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
                       </div>
                     </>
                   )}
-                </>
+                </div>
               )
             })()}
-          </div>
         </div>
 
         {/* Cruce Kardex vs Operario — MARCADOR POSICIÓN, se mueve abajo */}
