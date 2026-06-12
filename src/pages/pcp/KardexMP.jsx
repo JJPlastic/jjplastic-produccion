@@ -295,6 +295,23 @@ export default function KardexMP({ onVolver, onLogout }) {
 
   const yaValidado = (obs) => (obs || '').includes('Validado PCP')
 
+  const validarDevolucion = async (entrada) => {
+    try {
+      const token = await getToken()
+      const kgPend = entrada.KgDevPendiente || 0
+      const kgNuevo = (entrada.KgDevueltos || 0) + kgPend
+      await updateListItem(token, 'Kardex_MP', entrada.ID, {
+        KgDevueltos: kgNuevo,
+        KgDevPendiente: 0,
+      })
+      setEntradas(prev => prev.map(e =>
+        e.ID === entrada.ID
+          ? { ...e, KgDevueltos: kgNuevo, KgDevPendiente: 0 }
+          : e
+      ))
+    } catch (err) { toastError(err) }
+  }
+
   const guardarDevolucion = async (id) => {
     const kg = parseFloat(editDevKg)
     if (isNaN(kg) || kg < 0) return
@@ -877,6 +894,16 @@ export default function KardexMP({ onVolver, onLogout }) {
                                     <span style={{ fontSize: '13px', color: '#333' }}>{kgEnt} kg</span>
                                     {pendienteOp && delta > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#e65100', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>+{delta.toFixed(2)} kg a validar</span>}
                                     {e.KgDevueltos > 0 && <span style={{ fontSize: '11px', color: '#f57f17' }}>↩ {e.KgDevueltos} dev.</span>}
+                                    {(e.KgDevPendiente || 0) > 0 && (
+                                      <>
+                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#b26a00', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>
+                                          ↩ {e.KgDevPendiente} dev. pendiente
+                                        </span>
+                                        <button type="button" onClick={() => validarDevolucion(e)} style={{ backgroundColor: '#fff8f0', color: '#e65100', border: '1px solid #ffcc80', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
+                                          ✓ Validar dev.
+                                        </button>
+                                      </>
+                                    )}
                                     {esOp && !yaValidado(e.Observacion) && (
                                       <button type="button" onClick={() => validarEntrada(e)} style={{ backgroundColor: '#e8f0fb', color: '#004895', border: '1px solid #90caf9', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>✓ Validar</button>
                                     )}

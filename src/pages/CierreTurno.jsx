@@ -348,10 +348,11 @@ export default function CierreTurno() {
               const e = mpEdits[principal.ID]
               if (!e) return Promise.resolve()
               return updateListItem(token, 'Kardex_MP', principal.ID, {
-                KgUsado:      (principal.KgUsado      || 0) + numEdit(e, 'KgUsado'),
-                KgMermaRec:   (principal.KgMermaRec   || 0) + numEdit(e, 'KgMermaRec'),
-                KgMermaNoRec: (principal.KgMermaNoRec || 0) + numEdit(e, 'KgMermaNoRec'),
-                KgDevueltos:  (principal.KgDevueltos  || 0) + numEdit(e, 'KgDevueltos'),
+                KgUsado:        (principal.KgUsado        || 0) + numEdit(e, 'KgUsado'),
+                KgMermaRec:     (principal.KgMermaRec     || 0) + numEdit(e, 'KgMermaRec'),
+                KgMermaNoRec:   (principal.KgMermaNoRec   || 0) + numEdit(e, 'KgMermaNoRec'),
+                // Devolución queda pendiente hasta que PCP valide
+                KgDevPendiente: (principal.KgDevPendiente || 0) + numEdit(e, 'KgDevueltos'),
               })
             })
           )
