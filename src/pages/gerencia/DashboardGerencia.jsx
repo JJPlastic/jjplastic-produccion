@@ -16,8 +16,9 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
   const { codigoMaquina, nombreMaquina, registros, ultimoParcial } = maq
 
   // Registro abierto (puede haber 0 o 1)
-  const abierto = registros.find(r => r.Estado === 'abierto') || null
-  const activa  = !!abierto
+  const abierto   = registros.find(r => r.Estado === 'abierto') || null
+  const activa    = !!abierto
+  const enParada  = activa && !!(abierto?.En_Parada)
 
   // Unidades del turno activo (del parcial) o del registro al cierre
   const confTurno = ultimoParcial?.Acum_Conf_Turno ?? (abierto?.UnidadesConformes ?? 0)
@@ -33,26 +34,30 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
   const minSinReporte = msDesdeUltimoParcial != null
     ? Math.floor(msDesdeUltimoParcial / 60000)
     : null
-  const sinReporte = activa && minSinReporte !== null && minSinReporte > 120
+  const sinReporte = activa && !enParada && minSinReporte !== null && minSinReporte > 120
 
   // Registros cerrados hoy (para historial rápido)
   const cerradosHoy = registros.filter(r => r.Estado === 'cerrado')
 
   // Colores de borde según estado
   const borderColor = !activa ? '#e0e0e0'
+    : enParada ? '#c62828'
     : sinReporte ? '#ff9800'
     : abierto?.Estado_Validacion ? (COLOR_ESTADO[abierto.Estado_Validacion] || '#4caf50')
     : '#4caf50'
 
   const bgHead = !activa ? '#f5f5f5'
+    : enParada ? '#ffebee'
     : sinReporte ? '#fff3e0'
     : '#f0fff4'
 
   const badgeColor = !activa ? '#9e9e9e'
+    : enParada ? '#c62828'
     : sinReporte ? '#ff9800'
     : '#4caf50'
 
   const badgeLabel = !activa ? 'Sin turno'
+    : enParada ? 'En parada'
     : sinReporte ? 'Sin reporte'
     : 'Activa'
 
@@ -173,8 +178,32 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
             </span>
           </div>
 
+          {/* Banner parada activa */}
+          {enParada && (
+            <div style={{
+              backgroundColor: '#c62828', color: 'white',
+              borderRadius: '8px', padding: '8px 12px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+            }}>
+              <span style={{ fontSize: '18px' }}>⏸</span>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 800 }}>Máquina en parada</div>
+                {(() => {
+                  const paradas = (() => { try { return JSON.parse(abierto.Paradas || '[]') } catch { return [] } })()
+                  const minAcum = paradas.reduce((s, p) => s + (p.duracion_minutos || 0), 0)
+                  return (
+                    <div style={{ fontSize: '11px', opacity: 0.85 }}>
+                      {paradas.length} parada{paradas.length !== 1 ? 's' : ''} registrada{paradas.length !== 1 ? 's' : ''}
+                      {minAcum > 0 && ` · ${Math.round(minAcum)} min acum.`}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Último parcial */}
-          {ultimoParcial ? (
+          {!enParada && ultimoParcial ? (
             <div style={{
               fontSize: '11px',
               color: sinReporte ? '#e65100' : '#bbb',
@@ -185,7 +214,7 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
                 {formatDistanceToNow(new Date(ultimoParcial.Timestamp), { locale: es, addSuffix: false })} atrás
               </span>
             </div>
-          ) : (
+          ) : !enParada && (
             <p style={{ fontSize: '11px', color: '#ccc', textAlign: 'center', margin: 0 }}>
               Sin parciales registrados aún
             </p>
@@ -336,8 +365,15 @@ export default function DashboardGerencia() {
   const handleRefresh = () => { cargarDatos(); setCountdown(INTERVALO_SEG) }
 
   // KPIs globales
-  const activas     = datos.filter(d => d.registros.some(r => r.Estado === 'abierto')).length
-  const sinTurno    = MAQUINAS_DISPONIBLES.length - activas
+  const enParadaCount = datos.filter(d => {
+    const ab = d.registros.find(r => r.Estado === 'abierto')
+    return !!ab?.En_Parada
+  }).length
+  const activas  = datos.filter(d => {
+    const ab = d.registros.find(r => r.Estado === 'abierto')
+    return ab && !ab.En_Parada
+  }).length
+  const sinTurno = MAQUINAS_DISPONIBLES.length - activas - enParadaCount
   const totalConf   = datos.reduce((s, d) => {
     const up = d.ultimoParcial
     if (up) return s + (up.Acum_Conf_Turno || 0)
@@ -398,10 +434,10 @@ export default function DashboardGerencia() {
         {/* KPIs resumen */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
           {[
-            { valor: activas,           label: 'Máquinas activas',   color: '#4caf50' },
-            { valor: sinTurno,          label: 'Sin turno',          color: '#9e9e9e' },
-            { valor: totalConf.toLocaleString(),       label: 'Und. conformes (turnos activos)',  color: '#004895' },
-            { valor: totalCerradosHoy.toLocaleString(), label: 'Und. en turnos cerrados hoy', color: '#6a1b9a' },
+            { valor: activas,                          label: 'Produciendo',              color: '#4caf50' },
+            { valor: enParadaCount,                    label: 'En parada',                color: '#c62828' },
+            { valor: sinTurno,                         label: 'Sin turno',                color: '#9e9e9e' },
+            { valor: totalConf.toLocaleString(),       label: 'Und. conformes activas',   color: '#004895' },
           ].map(({ valor, label, color }) => (
             <div key={label} style={{
               backgroundColor: 'white', borderRadius: '12px',
@@ -418,7 +454,8 @@ export default function DashboardGerencia() {
         {/* Leyenda */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
           {[
-            { color: '#4caf50', label: 'Activa' },
+            { color: '#4caf50', label: 'Produciendo' },
+            { color: '#c62828', label: 'En parada' },
             { color: '#ff9800', label: 'Sin reporte +2h' },
             { color: '#e0e0e0', label: 'Sin turno' },
           ].map(({ color, label }) => (

@@ -85,7 +85,7 @@ export default function ParadaMaquina() {
         catch { return [] }
       })()
       const paradasNuevas = [...paradasActuales, nuevaParada]
-      const payload = { Paradas: JSON.stringify(paradasNuevas) }
+      const payload = { Paradas: JSON.stringify(paradasNuevas), En_Parada: false }
 
       if (turnoActivo.spId && navigator.onLine) {
         const token = await getToken()
@@ -100,7 +100,7 @@ export default function ParadaMaquina() {
       }
 
       // Actualizar estado local inmediatamente
-      await actualizarTurnoLocal({ Paradas: JSON.stringify(paradasNuevas) })
+      await actualizarTurnoLocal({ Paradas: JSON.stringify(paradasNuevas), En_Parada: false })
       setPantalla('turno-activo')
     } catch (err) {
       setError('Error al guardar: ' + err.message)
@@ -189,7 +189,17 @@ export default function ParadaMaquina() {
 
         {/* Botones */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px', marginTop: '2px' }}>
-          <button type="button" onClick={() => setPantalla('turno-activo')} style={{
+          <button type="button" onClick={async () => {
+            // Limpiar bandera de parada al cancelar
+            await actualizarTurnoLocal({ En_Parada: false })
+            if (turnoActivo?.spId && navigator.onLine) {
+              try {
+                const token = await getToken()
+                if (token) updateListItem(token, 'Registro_Produccion', turnoActivo.spId, { En_Parada: false })
+              } catch {}
+            }
+            setPantalla('turno-activo')
+          }} style={{
             padding: '14px', borderRadius: '10px', border: '2px solid #ccc',
             backgroundColor: 'white', color: '#555', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
           }}>Cancelar</button>

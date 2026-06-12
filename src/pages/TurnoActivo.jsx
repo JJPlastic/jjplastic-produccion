@@ -410,7 +410,17 @@ export default function TurnoActivo() {
 
           {/* Parada + Finalizar */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <button onClick={() => setPantalla('parada')} style={{
+            <button onClick={async () => {
+              setPantalla('parada')
+              // Marcar en SP para que Gerencia vea la parada en tiempo real
+              await actualizarTurnoLocal({ En_Parada: true })
+              if (turnoActivo?.spId && navigator.onLine) {
+                try {
+                  const token = await getToken()
+                  if (token) updateListItem(token, 'Registro_Produccion', turnoActivo.spId, { En_Parada: true })
+                } catch {}
+              }
+            }} style={{
               backgroundColor: '#c62828', color: 'white', border: 'none', borderRadius: '14px',
               padding: '16px', fontSize: '15px', fontWeight: 700, minHeight: '56px', cursor: 'pointer',
             }}>⏸ Parada</button>
