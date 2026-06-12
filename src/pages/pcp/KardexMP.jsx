@@ -863,18 +863,21 @@ export default function KardexMP({ onVolver, onLogout }) {
                         const pendiente = e.Observacion?.includes('operario') && !yaValidado(e.Observacion)
                         return s + (pendiente ? (e.KgDeclaradoOperario || e.KgEntregados || 0) : (e.KgEntregados || 0))
                       }, 0)
-                      const totalDevE = entries.reduce((s, e) => s + (e.KgDevueltos || 0), 0)
+                      const totalDevE    = entries.reduce((s, e) => s + (e.KgDevueltos    || 0), 0)
+                      const totalDevPend = entries.reduce((s, e) => s + (e.KgDevPendiente || 0), 0)
                       const tieneOp = entries.some(e => e.Observacion?.includes('operario'))
                       return (
                         <div key={nombre} style={{ padding: '12px 16px', borderTop: gIdx > 0 ? '1px solid #f0f0f0' : 'none' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{resolverNombreMaestro(nombre)}</span>
-                              {tieneOp && <span style={{ marginLeft: '8px', backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>OP</span>}
+                              {tieneOp && <span style={{ backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>OP</span>}
+                              {totalDevPend > 0 && <span style={{ backgroundColor: '#fff3e0', color: '#e65100', borderRadius: '4px', padding: '1px 6px', fontSize: '10px', fontWeight: 700 }}>↩ DEV PCP</span>}
                             </div>
                             <span style={{ fontSize: '16px', fontWeight: 700, color: '#004895' }}>
                               {totalKg.toFixed(2)} kg
-                              {totalDevE > 0 && <span style={{ fontSize: '12px', color: '#f57f17', marginLeft: '6px' }}>−{totalDevE.toFixed(2)}</span>}
+                              {totalDevE    > 0 && <span style={{ fontSize: '12px', color: '#f57f17', marginLeft: '6px' }}>−{totalDevE.toFixed(2)}</span>}
+                              {totalDevPend > 0 && <span style={{ fontSize: '12px', fontWeight: 700, color: '#e65100', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '0 5px', marginLeft: '6px' }}>↩ −{totalDevPend.toFixed(2)} pend.</span>}
                             </span>
                           </div>
                           {entries.map((e, eIdx) => {
@@ -896,10 +899,10 @@ export default function KardexMP({ onVolver, onLogout }) {
                                     {e.KgDevueltos > 0 && <span style={{ fontSize: '11px', color: '#f57f17' }}>↩ {e.KgDevueltos} dev.</span>}
                                     {(e.KgDevPendiente || 0) > 0 && (
                                       <>
-                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#b26a00', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>
-                                          ↩ {e.KgDevPendiente} dev. pendiente
+                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#e65100', backgroundColor: '#fff3e0', borderRadius: '4px', padding: '1px 6px' }}>
+                                          ↩ {(e.KgDevPendiente || 0).toFixed(2)} kg dev. a validar
                                         </span>
-                                        <button type="button" onClick={() => validarDevolucion(e)} style={{ backgroundColor: '#fff8f0', color: '#e65100', border: '1px solid #ffcc80', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
+                                        <button type="button" onClick={() => validarDevolucion(e)} style={{ backgroundColor: '#e8f0fb', color: '#004895', border: '1px solid #90caf9', borderRadius: '4px', padding: '1px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
                                           ✓ Validar dev.
                                         </button>
                                       </>
