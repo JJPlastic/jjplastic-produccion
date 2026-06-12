@@ -978,9 +978,9 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
                                     }}>✓ Ok</button>
                                   ) : (
                                     <button onClick={() => setModalReg(reg)} style={{
-                                      backgroundColor: '#004895', color: 'white', border: 'none',
+                                      backgroundColor: '#e8f0fb', color: '#004895', border: '1.5px solid #004895',
                                       borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
-                                      fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                                      fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                                     }}>Validar</button>
                                   )}
                                 </div>
