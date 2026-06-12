@@ -282,7 +282,6 @@ export default function CierreTurno() {
       MP_Consumida_Calc:     kgPorUnidad > 0 ? parseFloat((prodTotal * kgPorUnidad).toFixed(3)) : parseFloat(mpBaseTotal.toFixed(3)),
       Produccion_Teorica:    parseFloat(prodTeorica.toFixed(1)),
       Diferencia_Pct:        parseFloat(diferencia.toFixed(2)),
-      Fecha_Validacion:      ahora.toISOString(),
       KgMPRestante:          parseFloat(kgMPRestante.toFixed(3)),
       ...(obsPcpAuto ? { Obs_PCP: obsPcpAuto } : {}),
     }
