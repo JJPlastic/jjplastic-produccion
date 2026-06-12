@@ -1033,7 +1033,11 @@ export default function KardexMP({ onVolver, onLogout }) {
                             const subDev = subGrupo.items.reduce((s, i) => s + (i.KgDevueltos  || 0), 0)
                             const subNeto = subEnt - subDev
                             const yaProdujo  = grupo.numeroOF && ofsConRegistro.has(grupo.numeroOF)
-                            const hayMpUsada = subGrupo.items.some(e => (e.KgUsado || 0) > 0)
+                            const hayMpUsada  = subGrupo.items.some(e => (e.KgUsado || 0) > 0)
+                            const saldoSubGrupo = subGrupo.items.reduce((s, e) =>
+                              s + (e.KgEntregados || 0) - (e.KgUsado || 0) - (e.KgDevueltos || 0)
+                                - (e.KgDevPendiente || 0) - (e.KgMermaRec || 0) - (e.KgMermaNoRec || 0), 0)
+                            const puedeTransferir = hayMpUsada && saldoSubGrupo > 0.001
                             return (
                               <div key={subGrupo.maquina} style={{ borderTop: sIdx > 0 ? '3px solid #e8f0fb' : 'none' }}>
                                 {/* Cabecera de máquina (solo si hay más de una) */}
@@ -1059,10 +1063,10 @@ export default function KardexMP({ onVolver, onLogout }) {
                                       ↔ Reasignar máquina
                                     </button>
                                     <button
-                                      onClick={() => { if (hayMpUsada) { setModalTransferir({ grupo: { ...subGrupo, numeroOF: grupo.numeroOF } }); setMaqDestinoSel('') } }}
-                                      disabled={!hayMpUsada}
-                                      title={!hayMpUsada ? 'Aún no se usó MP — usa "Reasignar máquina"' : 'Transferir kg no usados a otra máquina'}
-                                      style={{ backgroundColor: !hayMpUsada ? '#f5f5f5' : tieneTransfPendiente ? '#37BEEC' : '#e3f7fd', color: !hayMpUsada ? '#bbb' : tieneTransfPendiente ? 'white' : '#0288d1', border: `1.5px solid ${!hayMpUsada ? '#e0e0e0' : tieneTransfPendiente ? '#37BEEC' : '#0288d1'}`, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700, cursor: !hayMpUsada ? 'not-allowed' : 'pointer' }}>
+                                      onClick={() => { if (puedeTransferir) { setModalTransferir({ grupo: { ...subGrupo, numeroOF: grupo.numeroOF } }); setMaqDestinoSel('') } }}
+                                      disabled={!puedeTransferir}
+                                      title={!hayMpUsada ? 'Aún no se usó MP — usa "Reasignar máquina"' : !puedeTransferir ? 'Saldo 0 — no hay kg para transferir' : 'Transferir kg no usados a otra máquina'}
+                                      style={{ backgroundColor: !puedeTransferir ? '#f5f5f5' : tieneTransfPendiente ? '#37BEEC' : '#e3f7fd', color: !puedeTransferir ? '#bbb' : tieneTransfPendiente ? 'white' : '#0288d1', border: `1.5px solid ${!puedeTransferir ? '#e0e0e0' : tieneTransfPendiente ? '#37BEEC' : '#0288d1'}`, borderRadius: '8px', padding: '5px 12px', fontSize: '11px', fontWeight: 700, cursor: !puedeTransferir ? 'not-allowed' : 'pointer' }}>
                                       → Transferir kg restantes
                                     </button>
                                   </div>
