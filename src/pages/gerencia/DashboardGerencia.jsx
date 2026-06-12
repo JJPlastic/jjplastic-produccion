@@ -230,17 +230,15 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
               </p>
               {cerradosHoy.map(r => (
                 <div key={r.ID} style={{
-                  padding: '6px 0', borderBottom: '1px solid #f5f5f5',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '5px 0', borderBottom: '1px solid #f5f5f5', fontSize: '12px', gap: '8px',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                    <span style={{ color: '#333', fontWeight: 600 }}>{resolverProd(r.Producto)}</span>
-                    <span style={{ color: '#2e7d32', fontWeight: 700 }}>
-                      {(r.UnidadesConformes || 0).toLocaleString()} ✓
-                    </span>
-                  </div>
-                  {r.Color && (
-                    <span style={{ fontSize: '11px', color: '#888' }}>🎨 {r.Color}</span>
-                  )}
+                  <span style={{ color: '#333', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {resolverProd(r.Producto)}{r.Color ? ` · ${r.Color}` : ''}
+                  </span>
+                  <span style={{ color: '#2e7d32', fontWeight: 700, flexShrink: 0 }}>
+                    {(r.UnidadesConformes || 0).toLocaleString()} ✓
+                  </span>
                 </div>
               ))}
             </div>
