@@ -955,10 +955,11 @@ export default function KardexMP({ onVolver, onLogout }) {
                     (i.Observacion?.includes('operario') && !yaValidado(i.Observacion)) ||
                     (i.KgDeclaradoOperario != null && Math.abs((i.KgDeclaradoOperario || 0) - (i.KgEntregados || 0)) > 0.01 && !yaValidado(i.Observacion))
                   )
-                  const todosValidados = grupo.items.length > 0 && grupo.items.every(i => yaValidado(i.Observacion))
+                  const tieneDevPendiente = grupo.items.some(i => (i.KgDevPendiente || 0) > 0)
+                  const todosValidados = grupo.items.length > 0 && grupo.items.every(i => yaValidado(i.Observacion)) && !tieneDevPendiente
                   const tieneTransfPendiente = grupo.numeroOF && ofsConTransferencia.has(grupo.numeroOF)
-                  const bgHeader    = tieneOpSinValidar ? '#e65100' : tieneTransfPendiente ? '#0277bd' : '#004895'
-                  const borderColor = tieneOpSinValidar ? '#ff9800' : tieneTransfPendiente ? '#81d4fa' : '#90caf9'
+                  const bgHeader    = (tieneOpSinValidar || tieneDevPendiente) ? '#e65100' : tieneTransfPendiente ? '#0277bd' : '#004895'
+                  const borderColor = (tieneOpSinValidar || tieneDevPendiente) ? '#ff9800' : tieneTransfPendiente ? '#81d4fa' : '#90caf9'
                   const maquinasArr = Object.values(grupo.maquinasMap)
 
                   return (
@@ -992,6 +993,7 @@ export default function KardexMP({ onVolver, onLogout }) {
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             {todosValidados && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>✓ Validado PCP</span>}
                             {tieneOpSinValidar && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>👤 Por operario · pendiente validación</span>}
+                            {tieneDevPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>↩ Dev. · pendiente validación</span>}
                             {tieneTransfPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>→ Transferencia pendiente</span>}
                           </div>
                         </div>
