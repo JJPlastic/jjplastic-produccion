@@ -63,7 +63,7 @@ const BigButton = ({ onClick, color, children, disabled }) => (
 
 export default function TurnoActivo() {
   const { getToken, logout } = useMsal()
-  const { turnoActivo, actualizarTurnoLocal, pendingCount, setPantalla, limpiarTurno } = useApp()
+  const { turnoActivo, actualizarTurnoLocal, pendingCount, setPantalla, limpiarTurno, seleccionarRol } = useApp()
   const [segundos, setSegundos]         = useState(0)
   const [subiendo, setSubiendo]           = useState(false)
   const [modalParcial, setModalParcial]   = useState(false)
@@ -309,6 +309,7 @@ export default function TurnoActivo() {
         subtitulo={`${turnoLabels[turnoActivo.Turno] || turnoActivo.Turno} · ${format(parseISO(turnoActivo.HoraInicio), 'HH:mm', { locale: es })}`}
         pendingCount={pendingCount}
         onLogout={logout}
+        onCambiarRol={() => seleccionarRol(null)}
         color="#2e7d32"
       />
 
