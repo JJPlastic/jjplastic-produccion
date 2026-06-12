@@ -152,7 +152,7 @@ const RouterPCP = () => {
             onIrKardex={() => setPcpPantalla('kardex')}
             onIrTablets={rol === 'bi' ? () => setPcpPantalla('tablets') : null}
             onLogout={logout}
-            onCambiarRol={() => seleccionarRol(null)} />
+            onCambiarRol={rol === 'bi' ? () => seleccionarRol(null) : null} />
         : pcpPantalla === 'kardex'
           ? <KardexMP onVolver={() => setPcpPantalla('validacion')} onLogout={logout} />
           : <GestionTablets onVolver={() => setPcpPantalla('validacion')} onLogout={logout} />
