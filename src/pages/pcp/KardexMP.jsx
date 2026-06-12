@@ -953,10 +953,13 @@ export default function KardexMP({ onVolver, onLogout }) {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {lista.map(grupo => {
-                  const totalEnt  = grupo.items.reduce((s, i) => s + (i.KgEntregados || 0), 0)
-                  const totalDev  = grupo.items.reduce((s, i) => s + (i.KgDevueltos  || 0), 0)
-                  const netoTotal = totalEnt - totalDev
-                  const abierto   = gruposAbiertos[grupo.key] === true
+                  const totalEnt     = grupo.items.reduce((s, i) => s + (i.KgEntregados  || 0), 0)
+                  const totalUsado   = grupo.items.reduce((s, i) => s + (i.KgUsado       || 0), 0)
+                  const totalDev     = grupo.items.reduce((s, i) => s + (i.KgDevueltos   || 0), 0)
+                  const totalDevPend = grupo.items.reduce((s, i) => s + (i.KgDevPendiente|| 0), 0)
+                  const totalMerma   = grupo.items.reduce((s, i) => s + (i.KgMermaRec || 0) + (i.KgMermaNoRec || 0), 0)
+                  const totalSaldo   = totalEnt - totalUsado - totalDev - totalDevPend - totalMerma
+                  const abierto      = gruposAbiertos[grupo.key] === true
 
                   const tieneOpSinValidar = grupo.items.some(i =>
                     (i.Observacion?.includes('operario') && !yaValidado(i.Observacion)) ||
@@ -973,36 +976,45 @@ export default function KardexMP({ onVolver, onLogout }) {
                     <div key={grupo.key} style={{ borderRadius: '12px', border: `1.5px solid ${borderColor}`, overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
                       {/* Cabecera OF */}
                       <div onClick={() => toggleGrupo(grupo.key)} style={{ backgroundColor: bgHeader, color: 'white', padding: '12px 14px', cursor: 'pointer' }}>
-                        {/* Fila 1: OF + kg + flecha */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          {grupo.numeroOF
-                            ? <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}>🔖 {grupo.numeroOF}</span>
-                            : <strong style={{ fontSize: '15px' }}>{maquinasArr[0]?.maquina || '—'}</strong>
-                          }
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <strong style={{ fontSize: '17px' }}>{netoTotal.toFixed(2)} kg</strong>
-                            <span style={{ opacity: 0.6, fontSize: '16px' }}>{abierto ? '▲' : '▼'}</span>
-                          </div>
-                        </div>
-                        {/* Fila 2: máquinas + fecha + desglose + badges */}
-                        <div style={{ marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {/* Fila 1: OF + máquina/fecha + flecha */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            {grupo.numeroOF
+                              ? <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}>🔖 {grupo.numeroOF}</span>
+                              : <strong style={{ fontSize: '15px' }}>{maquinasArr[0]?.maquina || '—'}</strong>
+                            }
                             {maquinasArr.map(s => (
                               <span key={s.maquina} style={{ fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: '6px', padding: '1px 8px' }}>
                                 {s.maquina} · T{s.turno}
                               </span>
                             ))}
-                            <span style={{ fontSize: '11px', opacity: 0.6 }}>
+                            <span style={{ fontSize: '11px', opacity: 0.55 }}>
                               {grupo.fecha ? format(new Date(grupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
-                              {totalDev > 0 && <span style={{ marginLeft: '6px' }}>{totalEnt.toFixed(2)} ent. − {totalDev.toFixed(2)} dev.</span>}
                             </span>
                           </div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {todosValidados && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>✓ Validado PCP</span>}
-                            {tieneOpSinValidar && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>👤 Por operario · pendiente validación</span>}
-                            {tieneDevPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>↩ Dev. · pendiente validación</span>}
-                            {tieneTransfPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>→ Transferencia pendiente</span>}
-                          </div>
+                          <span style={{ opacity: 0.6, fontSize: '16px', flexShrink: 0 }}>{abierto ? '▲' : '▼'}</span>
+                        </div>
+                        {/* Fila 2: desglose kg */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                          {[
+                            { label: 'Entregado', value: totalEnt,   color: 'rgba(255,255,255,0.9)' },
+                            { label: 'Usado',     value: totalUsado, color: 'rgba(255,255,255,0.9)' },
+                            { label: 'Devuelto',  value: totalDev + totalDevPend, color: totalDev + totalDevPend > 0 ? '#ffd54f' : 'rgba(255,255,255,0.9)' },
+                            { label: 'Merma',     value: totalMerma, color: totalMerma > 0 ? '#ffd54f' : 'rgba(255,255,255,0.9)' },
+                            { label: 'Saldo',     value: totalSaldo, color: totalSaldo < -0.01 ? '#ff8a80' : totalSaldo > 0.01 ? '#b9f6ca' : 'rgba(255,255,255,0.9)' },
+                          ].map(({ label, value, color }) => (
+                            <div key={label} style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '5px 4px', textAlign: 'center' }}>
+                              <div style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>{label}</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color }}>{value.toFixed(1)}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Fila 3: badges */}
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {todosValidados && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>✓ Validado PCP</span>}
+                          {tieneOpSinValidar && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>👤 Por operario · pendiente validación</span>}
+                          {tieneDevPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>↩ Dev. · pendiente validación</span>}
+                          {tieneTransfPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>→ Transferencia pendiente</span>}
                         </div>
                       </div>
 
