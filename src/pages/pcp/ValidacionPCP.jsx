@@ -522,7 +522,7 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
       if (!token) return
       const [regs, prods, kardexItems] = await Promise.allSettled([
         getListItems(token, 'Registro_Produccion', { orderby: 'HoraInicio desc', top: 200 }),
-        getListItems(token, 'Maestro_Productos'),
+        getListItems(token, 'Maestro_Productos', { top: 500 }),
         getListItems(token, 'Kardex_MP', { top: 500 }),
       ])
 
