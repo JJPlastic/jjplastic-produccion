@@ -494,7 +494,7 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
 }
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
-export default function ValidacionPCP({ onIrKardex, onIrTablets, onIrGerencia, onLogout, onCambiarRol }) {
+export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCambiarRol }) {
   const { getToken, usuario } = useMsal()
   const [registros, setRegistros] = useState([])
   const [productos, setProductos] = useState({})       // { codigo: kgPorUnidad }
@@ -793,11 +793,6 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onIrGerencia, o
           {onIrTablets && (
             <button onClick={onIrTablets} style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
               🖥 Tablets
-            </button>
-          )}
-          {onIrGerencia && (
-            <button onClick={onIrGerencia} style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
-              📊 Gerencia
             </button>
           )}
           {onCambiarRol && (
