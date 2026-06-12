@@ -150,15 +150,30 @@ export default function BienvenidaOperario() {
   const ultimoReg = registrosCerrados[0] || null
   const primerNombre = usuario?.nombre?.split(' ')[0] || ''
 
-  // Hay saldo si algún item del Kardex de la última OF todavía tiene kg disponibles
-  const haySaldoMP = kardexUltimaOF.length > 0 && kardexUltimaOF.some(k => {
-    const kg = (k.KgEntregados > 0) ? k.KgEntregados : (k.KgDeclaradoOperario || 0)
-    const saldo = kg - (k.KgUsado || 0) - (k.KgMermaRec || 0) - (k.KgMermaNoRec || 0) - (k.KgDevueltos || 0)
-    return saldo > 0.01
-  })
+  // Agrega saldo neto por insumo+producto (maneja múltiples entregas del mismo insumo)
+  const saldoNetoKardex = (() => {
+    const map = {}
+    kardexUltimaOF.forEach(k => {
+      const key = `${(k.Insumo || '').trim().toLowerCase()}|${k.Producto || ''}`
+      if (!map[key]) map[key] = { producto: k.Producto || '', entregado: 0, consumido: 0 }
+      map[key].entregado += (k.KgEntregados > 0 ? k.KgEntregados : (k.KgDeclaradoOperario || 0))
+      map[key].consumido += (k.KgUsado || 0) + (k.KgMermaRec || 0) + (k.KgMermaNoRec || 0)
+                          + (k.KgDevueltos || 0) + (k.KgDevPendiente || 0)
+    })
+    return Object.values(map)
+  })()
+
+  // Retorna true si el producto dado tiene saldo neto > 0 en el Kardex de la OF
+  const tienesSaldo = (cod) => {
+    if (!ultimoReg?.Numero_OF) return true   // sin OF: no hay Kardex que checar
+    if (kardexUltimaOF.length === 0) return false // OF existe pero no cargó aún
+    const entriesDeProducto = saldoNetoKardex.filter(e => !e.producto || e.producto === cod)
+    return entriesDeProducto.some(e => e.entregado - e.consumido > 0.01)
+  }
+
   // Si el último turno fue cerrado con "se transfiere", la OF pasa a otra máquina
   const fueTransferida = !!(ultimoReg?.Transferencia_Pendiente)
-  const puedeContinuar = haySaldoMP && !fueTransferida
+  const puedeContinuar = tienesSaldo(ultimoReg?.Producto) && !fueTransferida
 
   return (
     <div style={{
@@ -344,11 +359,13 @@ export default function BienvenidaOperario() {
                   <p style={{ fontSize: '11px', color: '#888', margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '2px' }}>
                     Productos pendientes de la OF
                   </p>
-                  {pendingProductos.map(cod => (
+                  {pendingProductos.map(cod => {
+                    const bloqueado = fueTransferida || !tienesSaldo(cod)
+                    return (
                     <button
                       key={cod}
                       onClick={async () => {
-                        if (fueTransferida) return
+                        if (bloqueado) return
                         setCargandoReg('prod-' + cod)
                         await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
                         setModoRelevo(false)
@@ -356,21 +373,22 @@ export default function BienvenidaOperario() {
                         setPantalla('cambio-producto')
                         setCargandoReg(null)
                       }}
-                      disabled={!!cargandoReg || fueTransferida}
-                      title={fueTransferida ? 'OF transferida a otra máquina' : ''}
+                      disabled={!!cargandoReg || bloqueado}
+                      title={fueTransferida ? 'OF transferida a otra máquina' : !tienesSaldo(cod) ? 'Sin saldo de MP disponible para este producto' : ''}
                       style={{
                         width: '100%',
-                        background: fueTransferida ? '#bdbdbd' : 'linear-gradient(135deg, #004895, #1565c0)',
+                        background: bloqueado ? '#bdbdbd' : 'linear-gradient(135deg, #004895, #1565c0)',
                         color: 'white', border: 'none', borderRadius: '10px',
                         padding: '14px', fontSize: '14px', fontWeight: 700,
-                        minHeight: '50px', cursor: fueTransferida ? 'not-allowed' : 'pointer',
-                        opacity: fueTransferida ? 0.65 : 1,
-                        boxShadow: fueTransferida ? 'none' : '0 3px 10px rgba(0,72,149,0.3)',
+                        minHeight: '50px', cursor: bloqueado ? 'not-allowed' : 'pointer',
+                        opacity: bloqueado ? 0.65 : 1,
+                        boxShadow: bloqueado ? 'none' : '0 3px 10px rgba(0,72,149,0.3)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                       }}>
                       {cargandoReg === 'prod-' + cod ? '⏳' : '▶'} {resolverNombre(cod)}
                     </button>
-                  ))}
+                    )
+                  })}
                   {fueTransferida && (
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0', textAlign: 'center' }}>
                       OF transferida a otra máquina
