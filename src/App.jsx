@@ -145,17 +145,22 @@ const RouterPCP = () => {
   const [pcpPantalla, setPcpPantalla] = useState('validacion')
   const { seleccionarRol, rol } = useApp()
   const { logout } = useMsal()
+  const esBI  = rol === 'bi'
+  const esJefe = rol === 'jefeoperaciones'
   return (
     <Suspense fallback={<LoadingSpinner mensaje="Cargando..." />}>
       {pcpPantalla === 'validacion'
         ? <ValidacionPCP
             onIrKardex={() => setPcpPantalla('kardex')}
-            onIrTablets={rol === 'bi' ? () => setPcpPantalla('tablets') : null}
+            onIrTablets={(esBI || esJefe) ? () => setPcpPantalla('tablets') : null}
+            onIrGerencia={esBI ? () => setPcpPantalla('gerencia') : null}
             onLogout={logout}
-            onCambiarRol={rol === 'bi' ? () => seleccionarRol(null) : null} />
+            onCambiarRol={esBI ? () => seleccionarRol(null) : null} />
         : pcpPantalla === 'kardex'
           ? <KardexMP onVolver={() => setPcpPantalla('validacion')} onLogout={logout} />
-          : <GestionTablets onVolver={() => setPcpPantalla('validacion')} onLogout={logout} />
+          : pcpPantalla === 'tablets'
+            ? <GestionTablets onVolver={() => setPcpPantalla('validacion')} onLogout={logout} />
+            : <DashboardGerencia onVolver={() => setPcpPantalla('validacion')} />
       }
     </Suspense>
   )

@@ -494,7 +494,7 @@ const ModalCorreccion = ({ registro, kgPorUnidad, kgKardex, itemsKardexTurno = [
 }
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
-export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCambiarRol }) {
+export default function ValidacionPCP({ onIrKardex, onIrTablets, onIrGerencia, onLogout, onCambiarRol }) {
   const { getToken, usuario } = useMsal()
   const [registros, setRegistros] = useState([])
   const [productos, setProductos] = useState({})       // { codigo: kgPorUnidad }
@@ -795,9 +795,16 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
               🖥 Tablets
             </button>
           )}
-          <button onClick={onCambiarRol} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
-            Cambiar rol
-          </button>
+          {onIrGerencia && (
+            <button onClick={onIrGerencia} style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
+              📊 Gerencia
+            </button>
+          )}
+          {onCambiarRol && (
+            <button onClick={onCambiarRol} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'rgba(255,255,255,0.85)', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer' }}>
+              ⇄ Rol
+            </button>
+          )}
           <button onClick={onLogout} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
             Salir
           </button>

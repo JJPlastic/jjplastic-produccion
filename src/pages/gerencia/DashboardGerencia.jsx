@@ -262,9 +262,9 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
 }
 
 // ── Dashboard principal ───────────────────────────────────────────────────────
-export default function DashboardGerencia() {
+export default function DashboardGerencia({ onVolver }) {
   const { getToken, logout } = useMsal()
-  const { seleccionarRol }  = useApp()
+  const { seleccionarRol, rol } = useApp()
 
   const [datos, setDatos]                     = useState([])
   const [cargando, setCargando]               = useState(true)
@@ -454,15 +454,27 @@ export default function DashboardGerencia() {
               }}>
               Actualizar
             </button>
-            <button
-              onClick={() => seleccionarRol(null)}
-              style={{
-                backgroundColor: 'transparent', color: 'rgba(255,255,255,0.85)',
-                border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px',
-                padding: '5px 10px', fontSize: '11px', cursor: 'pointer',
-              }}>
-              ⇄ Rol
-            </button>
+            {rol === 'bi' ? (
+              <button
+                onClick={onVolver || (() => seleccionarRol(null))}
+                style={{
+                  backgroundColor: 'transparent', color: 'rgba(255,255,255,0.85)',
+                  border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px',
+                  padding: '5px 10px', fontSize: '11px', cursor: 'pointer',
+                }}>
+                ⇄ Rol
+              </button>
+            ) : (
+              <button
+                onClick={() => { if (window.confirm('¿Cerrar sesión?')) logout() }}
+                style={{
+                  backgroundColor: 'transparent', color: 'rgba(255,255,255,0.85)',
+                  border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px',
+                  padding: '5px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                }}>
+                Salir
+              </button>
+            )}
           </div>
         </div>
       </header>
