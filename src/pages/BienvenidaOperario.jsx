@@ -150,15 +150,28 @@ export default function BienvenidaOperario() {
   const ultimoReg = registrosCerrados[0] || null
   const primerNombre = usuario?.nombre?.split(' ')[0] || ''
 
-  // Hay saldo si algún item del Kardex de la última OF todavía tiene kg disponibles
-  const haySaldoMP = kardexUltimaOF.length > 0 && kardexUltimaOF.some(k => {
-    const kg = (k.KgEntregados > 0) ? k.KgEntregados : (k.KgDeclaradoOperario || 0)
-    const saldo = kg - (k.KgUsado || 0) - (k.KgMermaRec || 0) - (k.KgMermaNoRec || 0) - (k.KgDevueltos || 0)
-    return saldo > 0.01
+  // Saldo neto por clave insumo+producto — agrega múltiples entregas del mismo insumo
+  const saldoNetoPorClave = {}
+  kardexUltimaOF.forEach(k => {
+    const clave = `${(k.Insumo || '').trim().toLowerCase()}|${k.Producto || ''}`
+    if (!saldoNetoPorClave[clave]) {
+      saldoNetoPorClave[clave] = { producto: k.Producto || '', entregado: 0, consumido: 0 }
+    }
+    saldoNetoPorClave[clave].entregado += k.KgEntregados > 0 ? k.KgEntregados : (k.KgDeclaradoOperario || 0)
+    saldoNetoPorClave[clave].consumido += (k.KgUsado || 0) + (k.KgMermaRec || 0) + (k.KgMermaNoRec || 0) + (k.KgDevueltos || 0) + (k.KgDevPendiente || 0)
   })
+  const entradasSaldo = Object.values(saldoNetoPorClave)
+
+  // true si ese producto tiene saldo neto disponible (sin OF → siempre permite)
+  const tienesSaldo = (cod) => {
+    if (!ultimoReg?.Numero_OF) return true
+    if (entradasSaldo.length === 0) return false
+    return entradasSaldo.some(e => (!e.producto || e.producto === cod) && e.entregado - e.consumido > 0.01)
+  }
+
   // Si el último turno fue cerrado con "se transfiere", la OF pasa a otra máquina
   const fueTransferida = !!(ultimoReg?.Transferencia_Pendiente)
-  const puedeContinuar = haySaldoMP && !fueTransferida
+  const puedeContinuar = tienesSaldo(ultimoReg?.Producto) && !fueTransferida
 
   return (
     <div style={{
@@ -344,33 +357,37 @@ export default function BienvenidaOperario() {
                   <p style={{ fontSize: '11px', color: '#888', margin: '4px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '2px' }}>
                     Productos pendientes de la OF
                   </p>
-                  {pendingProductos.map(cod => (
-                    <button
-                      key={cod}
-                      onClick={async () => {
-                        if (fueTransferida) return
-                        setCargandoReg('prod-' + cod)
-                        await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
-                        setModoRelevo(false)
-                        setProductoPreseleccionado(cod)
-                        setPantalla('cambio-producto')
-                        setCargandoReg(null)
-                      }}
-                      disabled={!!cargandoReg || fueTransferida}
-                      title={fueTransferida ? 'OF transferida a otra máquina' : ''}
-                      style={{
-                        width: '100%',
-                        background: fueTransferida ? '#bdbdbd' : 'linear-gradient(135deg, #004895, #1565c0)',
-                        color: 'white', border: 'none', borderRadius: '10px',
-                        padding: '14px', fontSize: '14px', fontWeight: 700,
-                        minHeight: '50px', cursor: fueTransferida ? 'not-allowed' : 'pointer',
-                        opacity: fueTransferida ? 0.65 : 1,
-                        boxShadow: fueTransferida ? 'none' : '0 3px 10px rgba(0,72,149,0.3)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                      }}>
-                      {cargandoReg === 'prod-' + cod ? '⏳' : '▶'} {resolverNombre(cod)}
-                    </button>
-                  ))}
+                  {pendingProductos.map(cod => {
+                    const sinSaldo = !tienesSaldo(cod)
+                    const bloq = fueTransferida || sinSaldo
+                    return (
+                      <button
+                        key={cod}
+                        onClick={async () => {
+                          if (bloq) return
+                          setCargandoReg('prod-' + cod)
+                          await setTurnoActivo({ ...ultimoReg, Paradas: ultimoReg.Paradas || '[]', spId: ultimoReg.ID, Estado: 'cerrado' })
+                          setModoRelevo(false)
+                          setProductoPreseleccionado(cod)
+                          setPantalla('cambio-producto')
+                          setCargandoReg(null)
+                        }}
+                        disabled={!!cargandoReg || bloq}
+                        title={fueTransferida ? 'OF transferida a otra máquina' : sinSaldo ? 'Sin saldo de MP disponible' : ''}
+                        style={{
+                          width: '100%',
+                          background: bloq ? '#bdbdbd' : 'linear-gradient(135deg, #004895, #1565c0)',
+                          color: 'white', border: 'none', borderRadius: '10px',
+                          padding: '14px', fontSize: '14px', fontWeight: 700,
+                          minHeight: '50px', cursor: bloq ? 'not-allowed' : 'pointer',
+                          opacity: bloq ? 0.65 : 1,
+                          boxShadow: bloq ? 'none' : '0 3px 10px rgba(0,72,149,0.3)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        }}>
+                        {cargandoReg === 'prod-' + cod ? '⏳' : '▶'} {resolverNombre(cod)}
+                      </button>
+                    )
+                  })}
                   {fueTransferida && (
                     <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0', textAlign: 'center' }}>
                       OF transferida a otra máquina
