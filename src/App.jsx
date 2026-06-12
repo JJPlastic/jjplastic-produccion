@@ -221,7 +221,7 @@ const Router = () => {
       try {
         const token = await getToken()
         if (!token || cancelled) return
-        const todos = await getListItems(token, 'Maestro_Operarios')
+        const todos = await getListItems(token, 'Maestro_Operarios', { top: 500 })
         if (cancelled) return
         const match = todos.find(o =>
           (o.Email || '').toLowerCase() === usuario.email.toLowerCase()
