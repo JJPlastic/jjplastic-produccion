@@ -869,7 +869,6 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
               const cerradosOf = todosLosItems.filter(r => r.Estado === 'cerrado')
               const todosValidados = cerradosOf.length > 0
                 && cerradosOf.every(r => r.Fecha_Validacion)
-                && !cerradosOf.some(r => r.Estado_Validacion === 'Rojo')
 
               return (
                 <div key={ofKey} style={{ borderRadius: '12px', border: `2px solid ${COLORES_SEMAFORO[estadoOf] || '#e0e4ea'}`, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}>
@@ -971,11 +970,19 @@ export default function ValidacionPCP({ onIrKardex, onIrTablets, onLogout, onCam
                                       👤 {reg.Operario || '—'} &nbsp;·&nbsp; ✓ {reg.UnidadesConformes ?? '—'} &nbsp;✗ {reg.UnidadesDefectuosas ?? '—'}
                                     </p>
                                   </div>
-                                  <button onClick={() => setModalReg(reg)} style={{
-                                    backgroundColor: '#004895', color: 'white', border: 'none',
-                                    borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
-                                    fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                                  }}>Validar</button>
+                                  {reg.Fecha_Validacion ? (
+                                    <button onClick={() => setModalReg(reg)} style={{
+                                      backgroundColor: '#e8f5e9', color: '#2e7d32', border: '1.5px solid #4caf50',
+                                      borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
+                                      fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                                    }}>✓ Ok</button>
+                                  ) : (
+                                    <button onClick={() => setModalReg(reg)} style={{
+                                      backgroundColor: '#004895', color: 'white', border: 'none',
+                                      borderRadius: '8px', padding: '7px 12px', fontSize: '12px',
+                                      fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                                    }}>Validar</button>
+                                  )}
                                 </div>
                               )
                             })}
