@@ -228,16 +228,23 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
               <p style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: 600 }}>
                 Turnos cerrados hoy
               </p>
-              {cerradosHoy.map(r => (
-                <div key={r.ID} style={{
+              {Object.values(
+                cerradosHoy.reduce((acc, r) => {
+                  const key = r.Producto || '—'
+                  if (!acc[key]) acc[key] = { producto: key, total: 0 }
+                  acc[key].total += r.UnidadesConformes || 0
+                  return acc
+                }, {})
+              ).map(({ producto, total }) => (
+                <div key={producto} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '5px 0', borderBottom: '1px solid #f5f5f5', fontSize: '12px', gap: '8px',
                 }}>
                   <span style={{ color: '#333', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {resolverProd(r.Producto)}{r.Color ? ` · ${r.Color}` : ''}
+                    {resolverProd(producto)}
                   </span>
                   <span style={{ color: '#2e7d32', fontWeight: 700, flexShrink: 0 }}>
-                    {(r.UnidadesConformes || 0).toLocaleString()} ✓
+                    {total.toLocaleString()} ✓
                   </span>
                 </div>
               ))}
