@@ -331,7 +331,7 @@ export default function BienvenidaOperario() {
                   setCargandoReg(null)
                 }}
                 disabled={!!cargandoReg || !puedeContinuar}
-                title={fueTransferida ? 'La OF fue transferida a otra máquina' : !haySaldoMP ? 'Sin saldo de MP disponible en Kardex para esta OF' : ''}
+                title={fueTransferida ? 'La OF fue transferida a otra máquina' : !puedeContinuar ? 'Sin saldo de MP disponible en Kardex para esta OF' : ''}
                 style={{
                   width: '100%',
                   background: puedeContinuar
