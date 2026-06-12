@@ -975,46 +975,53 @@ export default function KardexMP({ onVolver, onLogout }) {
                   return (
                     <div key={grupo.key} style={{ borderRadius: '12px', border: `1.5px solid ${borderColor}`, overflow: 'hidden', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
                       {/* Cabecera OF */}
-                      <div onClick={() => toggleGrupo(grupo.key)} style={{ backgroundColor: bgHeader, color: 'white', padding: '12px 14px', cursor: 'pointer' }}>
-                        {/* Fila 1: OF + máquina/fecha + flecha */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div onClick={() => toggleGrupo(grupo.key)} style={{ backgroundColor: bgHeader, color: 'white', padding: '11px 14px', cursor: 'pointer' }}>
+                        {/* Fila 1: OF + info + badge(s) + flecha */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flexWrap: 'wrap' }}>
                             {grupo.numeroOF
-                              ? <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700 }}>🔖 {grupo.numeroOF}</span>
-                              : <strong style={{ fontSize: '15px' }}>{maquinasArr[0]?.maquina || '—'}</strong>
+                              ? <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 800 }}>{grupo.numeroOF}</span>
+                              : <strong style={{ fontSize: '14px' }}>{maquinasArr[0]?.maquina || '—'}</strong>
                             }
                             {maquinasArr.map(s => (
-                              <span key={s.maquina} style={{ fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: '6px', padding: '1px 8px' }}>
+                              <span key={s.maquina} style={{ fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '5px', padding: '1px 7px', fontWeight: 600 }}>
                                 {s.maquina} · T{s.turno}
                               </span>
                             ))}
-                            <span style={{ fontSize: '11px', opacity: 0.55 }}>
+                            <span style={{ fontSize: '11px', opacity: 0.6 }}>
                               {grupo.fecha ? format(new Date(grupo.fecha + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
                             </span>
                           </div>
-                          <span style={{ opacity: 0.6, fontSize: '16px', flexShrink: 0 }}>{abierto ? '▲' : '▼'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            {todosValidados && (
+                              <span style={{ backgroundColor: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.45)', borderRadius: '20px', padding: '2px 9px', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' }}>✓ Validado PCP</span>
+                            )}
+                            {tieneOpSinValidar && (
+                              <span style={{ backgroundColor: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.45)', borderRadius: '20px', padding: '2px 9px', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' }}>👤 Pend. validación</span>
+                            )}
+                            {tieneDevPendiente && (
+                              <span style={{ backgroundColor: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.45)', borderRadius: '20px', padding: '2px 9px', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' }}>↩ Dev. pendiente</span>
+                            )}
+                            {tieneTransfPendiente && (
+                              <span style={{ backgroundColor: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.45)', borderRadius: '20px', padding: '2px 9px', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap' }}>→ Transf. pendiente</span>
+                            )}
+                            <span style={{ opacity: 0.55, fontSize: '14px' }}>{abierto ? '▲' : '▼'}</span>
+                          </div>
                         </div>
                         {/* Fila 2: desglose kg */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '5px' }}>
                           {[
-                            { label: 'Entregado', value: totalEnt,   color: 'rgba(255,255,255,0.9)' },
-                            { label: 'Usado',     value: totalUsado, color: 'rgba(255,255,255,0.9)' },
-                            { label: 'Devuelto',  value: totalDev + totalDevPend, color: totalDev + totalDevPend > 0 ? '#ffd54f' : 'rgba(255,255,255,0.9)' },
-                            { label: 'Merma',     value: totalMerma, color: totalMerma > 0 ? '#ffd54f' : 'rgba(255,255,255,0.9)' },
-                            { label: 'Saldo',     value: totalSaldo, color: totalSaldo < -0.01 ? '#ff8a80' : totalSaldo > 0.01 ? '#b9f6ca' : 'rgba(255,255,255,0.9)' },
-                          ].map(({ label, value, color }) => (
-                            <div key={label} style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '5px 4px', textAlign: 'center' }}>
-                              <div style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>{label}</div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color }}>{value.toFixed(1)}</div>
+                            { label: 'Entregado', value: totalEnt,   color: 'rgba(255,255,255,0.95)', bold: false },
+                            { label: 'Usado',     value: totalUsado, color: 'rgba(255,255,255,0.95)', bold: false },
+                            { label: 'Devuelto',  value: totalDev + totalDevPend, color: totalDev + totalDevPend > 0.01 ? '#ffd54f' : 'rgba(255,255,255,0.7)', bold: totalDev + totalDevPend > 0.01 },
+                            { label: 'Merma',     value: totalMerma, color: totalMerma > 0.01 ? '#ffd54f' : 'rgba(255,255,255,0.7)', bold: totalMerma > 0.01 },
+                            { label: 'Saldo',     value: totalSaldo, color: totalSaldo < -0.01 ? '#ff8a80' : totalSaldo > 0.01 ? '#b9f6ca' : 'rgba(255,255,255,0.8)', bold: true },
+                          ].map(({ label, value, color, bold }) => (
+                            <div key={label} style={{ backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: '7px', padding: '5px 6px', textAlign: 'center' }}>
+                              <div style={{ fontSize: '9px', opacity: 0.65, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>{label}</div>
+                              <div style={{ fontSize: '14px', fontWeight: bold ? 800 : 600, color, lineHeight: 1 }}>{value.toFixed(1)}</div>
                             </div>
                           ))}
-                        </div>
-                        {/* Fila 3: badges */}
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {todosValidados && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>✓ Validado PCP</span>}
-                          {tieneOpSinValidar && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>👤 Por operario · pendiente validación</span>}
-                          {tieneDevPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>↩ Dev. · pendiente validación</span>}
-                          {tieneTransfPendiente && <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '10px', padding: '2px 10px', fontSize: '11px', fontWeight: 700 }}>→ Transferencia pendiente</span>}
                         </div>
                       </div>
 
