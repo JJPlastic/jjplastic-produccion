@@ -5,16 +5,15 @@ import tailwindcss from '@tailwindcss/vite'
 
 const SP_BASE = '/sites/ProduccionJJPlastic/SiteAssets/app/'
 
+const base = process.env.VITE_BASE_URL || '/'
+
 export default defineConfig(({ mode }) => ({
-  // En producción los assets apuntan a la ruta de SharePoint
-  // En desarrollo apuntan a / (localhost)
-  base: '/',
+  base,
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Activar Service Worker inmediatamente sin esperar recarga
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
@@ -25,8 +24,8 @@ export default defineConfig(({ mode }) => ({
         background_color: '#004895',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: base,
+        scope: base,
         lang: 'es',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
