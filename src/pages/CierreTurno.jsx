@@ -404,7 +404,7 @@ export default function CierreTurno() {
                   hint: tieneReportes && acumDefTurno > 0 ? `${acumDefTurno} (avances) + ${parseInt(undDefWatch)||0} = ${totalDef}` : null },
                 { name: 'GruposConformes',     label: 'Grupos conformes',  color: '#555555', requerido: false, total: null,
                   hint: totalConfTurno > 0 ? `De las ${totalConfTurno} und. conformes del turno` : null },
-                { name: 'UnidadesSueltas',     label: 'Und. sueltas',      color: '#555555', requerido: true,  total: null,
+                { name: 'UnidadesSueltas',     label: 'Und. sueltas',      color: '#555555', requerido: false, total: null,
                   hint: totalConfTurno > 0 ? `Conformes sin grupo (${totalConfTurno} und. totales)` : null },
               ]
               return (
