@@ -110,34 +110,60 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
       {activa ? (
         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          {/* Producto + lote total */}
-          <div style={{
-            backgroundColor: '#f0fff4', borderRadius: '10px',
-            padding: '10px 12px',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
-          }}>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: '14px', fontWeight: 800, color: '#1a1a1a', lineHeight: 1.3, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {resolverProd(abierto.Producto)}
+          {/* Producto + color + OF */}
+          <div>
+            <p style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a1a', lineHeight: 1.3, margin: 0 }}>
+              {resolverProd(abierto.Producto)}
+            </p>
+            {abierto.Color && (
+              <p style={{ fontSize: '12px', color: '#555', margin: '2px 0 0' }}>🎨 {abierto.Color}</p>
+            )}
+            {abierto.Numero_OF && (
+              <p style={{ fontSize: '10px', color: '#aaa', fontFamily: 'monospace', margin: '2px 0 0' }}>
+                {abierto.Numero_OF}
               </p>
-              {abierto.Color && (
-                <p style={{ fontSize: '11px', color: '#555', margin: '2px 0 0' }}>{abierto.Color}</p>
-              )}
-              {abierto.Numero_OF && (
-                <p style={{ fontSize: '10px', color: '#aaa', fontFamily: 'monospace', margin: '1px 0 0' }}>
-                  {abierto.Numero_OF}
-                </p>
-              )}
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '28px', fontWeight: 900, color: '#2e7d32', lineHeight: 1 }}>
-                {confLote.toLocaleString()}
+            )}
+          </div>
+
+          {/* Métricas */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{
+              backgroundColor: '#f0fff4', borderRadius: '10px',
+              padding: '10px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '26px', fontWeight: 900, color: '#2e7d32', lineHeight: 1 }}>
+                {confTurno.toLocaleString()}
               </div>
-              <div style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', marginTop: '2px' }}>
-                und. en lote
+              <div style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', marginTop: '3px' }}>
+                Conformes turno
+              </div>
+            </div>
+            <div style={{
+              backgroundColor: defTurno > 0 ? '#fff3e0' : '#fafafa', borderRadius: '10px',
+              padding: '10px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '26px', fontWeight: 900, color: defTurno > 0 ? '#e65100' : '#ccc', lineHeight: 1 }}>
+                {defTurno.toLocaleString()}
+              </div>
+              <div style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', marginTop: '3px' }}>
+                Defectuosas
               </div>
             </div>
           </div>
+
+          {/* Acumulado lote (si difiere del turno) */}
+          {confLote > confTurno && (
+            <div style={{
+              backgroundColor: '#e8f0fb', borderRadius: '8px',
+              padding: '6px 10px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: '11px', color: '#004895', fontWeight: 600 }}>{abierto?.Numero_OF || 'Lote'}</span>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: '#004895' }}>
+                {confLote.toLocaleString()} und. en lote
+              </span>
+            </div>
+          )}
 
           {/* Operario + inicio */}
           <div style={{
