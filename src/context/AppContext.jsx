@@ -8,9 +8,10 @@ export const AppProvider = ({ children }) => {
   const [turnoActivo, setTurnoActivoState] = useState(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [cargandoInicial, setCargandoInicial] = useState(true)
-  // 'operario' | 'pcp' | 'bi' | 'jefeoperaciones' | 'gerencia' | null
-  // null = pendiente de detección desde Maestro_Operarios
+  // rol: rol de navegación actual (puede cambiar al usar ⇄ Rol)
+  // rolCuenta: rol real de la cuenta en Maestro_Operarios (fijo por sesión)
   const [rol, setRol]               = useState(null)
+  const [rolCuenta, setRolCuenta]   = useState(null)
   const [modoRelevo, setModoRelevo] = useState(false)
   const [ofPreseleccionada, setOfPreseleccionada] = useState(null)
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
@@ -71,7 +72,7 @@ export const AppProvider = ({ children }) => {
       turnoActivo, setTurnoActivo, actualizarTurnoLocal, limpiarTurno, irACambioProducto,
       pendingCount, refreshPendingCount,
       cargandoInicial,
-      rol, seleccionarRol,
+      rol, seleccionarRol, rolCuenta, setRolCuenta,
       modoRelevo, setModoRelevo,
       ofPreseleccionada, setOfPreseleccionada,
       productoPreseleccionado, setProductoPreseleccionado,

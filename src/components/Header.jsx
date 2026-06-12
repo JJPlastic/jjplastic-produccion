@@ -10,8 +10,8 @@ const BTN_ROL = {
 }
 
 export const Header = ({ titulo, subtitulo, pendingCount = 0, onLogout, onCambiarRol, accion, color = '#004895' }) => {
-  const { rol, seleccionarRol } = useApp()
-  const mostrarRol = onCambiarRol || rol === 'bi'
+  const { rolCuenta, seleccionarRol } = useApp()
+  const mostrarRol = onCambiarRol || rolCuenta === 'bi'
   const handleRol = onCambiarRol || (() => seleccionarRol(null))
 
   return (

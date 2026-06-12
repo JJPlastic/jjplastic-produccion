@@ -309,7 +309,6 @@ export default function TurnoActivo() {
         subtitulo={`${turnoLabels[turnoActivo.Turno] || turnoActivo.Turno} · ${format(parseISO(turnoActivo.HoraInicio), 'HH:mm', { locale: es })}`}
         pendingCount={pendingCount}
         onLogout={logout}
-        onCambiarRol={() => seleccionarRol(null)}
         color="#2e7d32"
       />
 

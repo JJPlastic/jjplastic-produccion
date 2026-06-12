@@ -401,7 +401,6 @@ export default function InicioTurno() {
         subtitulo={format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
         pendingCount={pendingCount}
         onLogout={logout}
-        onCambiarRol={() => seleccionarRol(null)}
       />
 
       <div style={{ padding: '10px 12px', maxWidth: '480px', margin: '0 auto' }}>

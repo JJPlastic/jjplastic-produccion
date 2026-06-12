@@ -185,7 +185,6 @@ export default function BienvenidaOperario() {
         subtitulo={fechaHoy}
         pendingCount={pendingCount}
         onLogout={logout}
-        onCambiarRol={() => seleccionarRol(null)}
         color="#002d5a"
       />
 

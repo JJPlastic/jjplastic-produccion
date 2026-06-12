@@ -143,9 +143,9 @@ const GestionTablets = lazy(() => import('./pages/bi/GestionTablets'))
 
 const RouterPCP = () => {
   const [pcpPantalla, setPcpPantalla] = useState('validacion')
-  const { seleccionarRol, rol } = useApp()
+  const { seleccionarRol, rolCuenta, rol } = useApp()
   const { logout } = useMsal()
-  const esBI   = rol === 'bi'
+  const esBI   = rolCuenta === 'bi'
   const esJefe = rol === 'jefeoperaciones'
   return (
     <Suspense fallback={<LoadingSpinner mensaje="Cargando..." />}>
@@ -174,7 +174,7 @@ const RouterGerencia = () => (
 )
 
 const Router = () => {
-  const { pantalla, cargandoInicial, rol, seleccionarRol } = useApp()
+  const { pantalla, cargandoInicial, rol, seleccionarRol, setRolCuenta } = useApp()
   const { msalInstance, getToken, usuario } = useMsal()
   const [detectando, setDetectando] = useState(false)
 
@@ -196,7 +196,9 @@ const Router = () => {
           (o.Email || '').toLowerCase() === usuario.email.toLowerCase()
         )
         if (match?.Rol) {
-          seleccionarRol(match.Rol.toLowerCase().replace(/\s/g, ''))
+          const rolNorm = match.Rol.toLowerCase().replace(/\s/g, '')
+          setRolCuenta(rolNorm)
+          seleccionarRol(rolNorm)
         }
         // Si no hay match → muestra SelectorRol (fallback manual)
       } catch {
