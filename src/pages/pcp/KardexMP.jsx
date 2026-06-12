@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { format, parseISO } from 'date-fns'
 import { SearchSelect } from '../../components/SearchSelect'
 import { useMsal } from '../../hooks/useMsal'
+import { useApp } from '../../context/AppContext'
 import { getListItems, createListItem, updateListItem, getOFsActivas } from '../../services/sharepoint'
 import { Toast, mensajeRed } from '../../components/Toast'
 
@@ -20,6 +21,7 @@ const grupoVacio = () => ({ id: crypto.randomUUID(), producto: '', filas: [filaV
 
 export default function KardexMP({ onVolver, onLogout }) {
   const { getToken } = useMsal()
+  const { rol, seleccionarRol } = useApp()
 
   // ── Tab activa ────────────────────────────────────────────────────────────
   const [tab, setTab] = useState('entregas') // 'entregas' | 'registrar'
@@ -509,6 +511,11 @@ export default function KardexMP({ onVolver, onLogout }) {
           <button onClick={onVolver} style={{ backgroundColor: 'rgba(255,255,255,0.25)', color: 'white', border: '1.5px solid rgba(255,255,255,0.6)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             ← Validación
           </button>
+          {rol === 'bi' && (
+            <button onClick={() => seleccionarRol(null)} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'rgba(255,255,255,0.85)', borderRadius: '8px', padding: '6px 10px', fontSize: '11px', cursor: 'pointer' }}>
+              ⇄ Rol
+            </button>
+          )}
           <button onClick={onLogout} style={{ backgroundColor: 'transparent', border: '1.5px solid rgba(255,255,255,0.5)', color: 'white', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' }}>
             Salir
           </button>
