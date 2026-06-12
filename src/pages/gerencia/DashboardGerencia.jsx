@@ -440,10 +440,11 @@ export default function DashboardGerencia() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ textAlign: 'right', fontSize: '11px', opacity: 0.7, lineHeight: 1.4 }}>
-              {ultimaAct && <p style={{ margin: 0 }}>Actualizado {format(ultimaAct, 'HH:mm:ss')}</p>}
-              <p style={{ margin: 0 }}>↺ en {countdown}s</p>
-            </div>
+            {ultimaAct && (
+              <div style={{ textAlign: 'right', fontSize: '11px', opacity: 0.7, lineHeight: 1.4 }}>
+                <p style={{ margin: 0 }}>Actualizado {format(ultimaAct, 'HH:mm:ss')}</p>
+              </div>
+            )}
             <button
               onClick={handleRefresh}
               style={{
@@ -456,11 +457,11 @@ export default function DashboardGerencia() {
             <button
               onClick={() => seleccionarRol(null)}
               style={{
-                backgroundColor: 'transparent', color: 'rgba(255,255,255,0.65)',
-                border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px',
-                padding: '6px 10px', fontSize: '11px', cursor: 'pointer',
+                backgroundColor: 'transparent', color: 'rgba(255,255,255,0.85)',
+                border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: '8px',
+                padding: '5px 10px', fontSize: '11px', cursor: 'pointer',
               }}>
-              Salir
+              ⇄ Rol
             </button>
           </div>
         </div>
