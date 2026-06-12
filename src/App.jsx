@@ -102,7 +102,6 @@ const SelectorRol = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
         {[
-          { rol: 'operario', icon: '🏭', label: 'Operario', desc: 'Registro de producción en planta', color: '#F8A12F', colorDk: '#e6901e' },
           { rol: 'pcp', icon: '📋', label: 'PCP / Supervisor', desc: 'Validación y Kardex de MP', color: '#37BEEC', colorDk: '#0288d1' },
           { rol: 'gerencia', icon: '📊', label: 'Gerencia', desc: 'Panel de producción en tiempo real', color: '#7b1fa2', colorDk: '#4a148c' },
         ].map(({ rol, icon, label, desc, color, colorDk }) => (
