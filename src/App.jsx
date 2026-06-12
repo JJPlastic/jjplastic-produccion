@@ -220,7 +220,8 @@ const Router = () => {
       setSinAcceso(false)
       try {
         const token = await getToken()
-        if (!token || cancelled) return
+        if (cancelled) return
+        if (!token) { setSinAcceso(true); return }
         const todos = await getListItems(token, 'Maestro_Operarios', { top: 500 })
         if (cancelled) return
         const match = todos.find(o =>
@@ -233,7 +234,8 @@ const Router = () => {
         } else {
           setSinAcceso(true)
         }
-      } catch {
+      } catch (err) {
+        console.error('[detectar] error:', err?.message || err)
         setSinAcceso(true)
       } finally {
         if (!cancelled) setDetectando(false)
