@@ -13,7 +13,7 @@ const COLOR_ESTADO = { Verde: '#4caf50', Amarillo: '#ff9800', Rojo: '#f44336' }
 
 // ── Tarjeta de máquina ────────────────────────────────────────────────────────
 const TarjetaMaquina = ({ maq, resolverProd }) => {
-  const { codigoMaquina, nombreMaquina, registros, ultimoParcial } = maq
+  const { codigoMaquina, nombreMaquina, registros, ultimoParcial, acumLoteCerrado = 0 } = maq
 
   // Registro abierto (puede haber 0 o 1)
   const abierto   = registros.find(r => r.Estado === 'abierto') || null
@@ -24,8 +24,8 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
   const confTurno = ultimoParcial?.Acum_Conf_Turno ?? (abierto?.UnidadesConformes ?? 0)
   const defTurno  = ultimoParcial?.Acum_Def_Turno  ?? (abierto?.UnidadesDefectuosas ?? 0)
 
-  // Acumulado del lote (varios turnos del mismo producto)
-  const confLote  = ultimoParcial?.Acum_Conf_Lote ?? confTurno
+  // Acumulado lote = cerrados del mismo Codigo_Lote + turno actual (igual que TurnoActivo)
+  const confLote = acumLoteCerrado + confTurno
 
   // Tiempo sin reporte de parcial
   const msDesdeUltimoParcial = ultimoParcial
@@ -158,9 +158,9 @@ const TarjetaMaquina = ({ maq, resolverProd }) => {
               padding: '6px 10px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
-              <span style={{ fontSize: '11px', color: '#004895', fontWeight: 600 }}>Acum. lote</span>
+              <span style={{ fontSize: '11px', color: '#004895', fontWeight: 600 }}>{abierto?.Numero_OF || 'Lote'}</span>
               <span style={{ fontSize: '15px', fontWeight: 800, color: '#004895' }}>
-                {confLote.toLocaleString()} und.
+                {confLote.toLocaleString()} und. en lote
               </span>
             </div>
           )}
@@ -332,6 +332,30 @@ export default function DashboardGerencia() {
         porMaquina[maq].push(r)
       })
 
+      // Para máquinas activas con Codigo_Lote → cargar registros CERRADOS del mismo lote
+      // (igual que TurnoActivo: acumOF + acumConfTurno = "und. en lote")
+      const abiertosPorMaq = {}
+      MAQUINAS_DISPONIBLES.forEach(m => {
+        const regs = porMaquina[m.codigoMaquina] || []
+        const ab = regs.find(r => r.Estado === 'abierto')
+        if (ab) abiertosPorMaq[m.codigoMaquina] = ab
+      })
+
+      const loteAcums = {} // { registroId → unidades conformes de cerrados del mismo lote }
+      await Promise.allSettled(
+        Object.values(abiertosPorMaq)
+          .filter(r => r.Codigo_Lote)
+          .map(async r => {
+            try {
+              const cerrados = await getListItems(token, 'Registro_Produccion', {
+                filter: `Codigo_Lote eq '${r.Codigo_Lote}' and Estado eq 'cerrado'`,
+                top: 50,
+              })
+              loteAcums[r.ID] = cerrados.reduce((s, c) => s + (c.UnidadesConformes || 0), 0)
+            } catch {}
+          })
+      )
+
       // Construir array de máquinas con su registro abierto y último parcial
       const resultado = MAQUINAS_DISPONIBLES.map(m => {
         const regsDeEsta = porMaquina[m.codigoMaquina] || []
@@ -341,6 +365,7 @@ export default function DashboardGerencia() {
           ...m,
           registros: regsDeEsta,
           ultimoParcial,
+          acumLoteCerrado: abierto ? (loteAcums[abierto.ID] || 0) : 0,
         }
       })
 
