@@ -291,9 +291,12 @@ export default function DashboardGerencia() {
     nombresProductos[codigo] || codigo || '—'
   , [nombresProductos])
 
+  const getTokenRef = useRef(getToken)
+  getTokenRef.current = getToken
+
   const cargarDatos = useCallback(async () => {
     try {
-      const token = await getToken()
+      const token = await getTokenRef.current()
       if (!token) return
 
       const hoy = new Date()
@@ -376,7 +379,7 @@ export default function DashboardGerencia() {
     } finally {
       setCargando(false)
     }
-  }, [getToken])
+  }, []) // getTokenRef.current siempre apunta al token actual sin recrear el callback
 
   // Carga inicial + polling cada INTERVALO_SEG
   useEffect(() => {
